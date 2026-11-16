@@ -61,7 +61,7 @@ jobs:
 
           # Ongale's API is behind Cloudflare, which refuses Python's default
           # User-Agent ("Python-urllib", error 1010): every request names itself.
-          UA = "ongale-deploy-workflow/6"
+          UA = "ongale-deploy-workflow/7"
 
           def warn(msg, path=None):
               print("::warning%s::%s" % (" file=" + path if path else "", msg))
@@ -153,9 +153,54 @@ jobs:
               height = subprocess.run([vips + "header", "-f", "height", out], capture_output=True, text=True, check=True).stdout
               return int(header), int(height)
 
+          # MP4s whose index (moov) comes after the media (mdat) can't start
+          # playing until the browser has fetched the file's end: the index
+          # is moved to the front (ffmpeg, no re-encoding) and that file goes up.
+          def moov_last(path):
+              with open(path, "rb") as f:
+                  end = os.fstat(f.fileno()).st_size
+                  pos = 0
+                  while pos + 8 <= end:
+                      f.seek(pos)
+                      head = f.read(16)
+                      size, kind = int.from_bytes(head[0:4], "big"), head[4:8]
+                      if size == 1 and len(head) == 16:
+                          size = int.from_bytes(head[8:16], "big")
+                      elif size == 0:
+                          size = end - pos
+                      if kind == b"moov":
+                          return False
+                      if kind == b"mdat":
+                          return True
+                      if size < 8:
+                          return False
+                      pos += size
+              return False
+
+          slow = [f for f in files if os.path.splitext(f)[1].lower() == ".mp4" and moov_last(f)]
+          ffmpeg = os.environ.get("ONGALE_FFMPEG", shutil.which("ffmpeg") or "")  # tests set it ("" = none)
+          if slow and not ffmpeg and os.environ.get("GITHUB_ACTIONS") == "true":
+              subprocess.run("sudo apt-get update -qq && sudo apt-get install -y -qq --no-install-recommends ffmpeg",
+                             shell=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+              ffmpeg = shutil.which("ffmpeg")
+          source = {}  # repository path → the file uploaded for it
+          for p in slow:
+              if not ffmpeg:
+                  warn("ffmpeg isn't available: this MP4 starts playing only after its end has loaded", p)
+                  continue
+              out = os.path.join(TMP, "faststart-" + hashlib.sha256(p.encode()).hexdigest()[:16] + ".mp4")
+              os.makedirs(TMP, exist_ok=True)
+              try:
+                  subprocess.run([ffmpeg, "-v", "error", "-y", "-i", p, "-map", "0", "-c", "copy", "-movflags", "+faststart", out],
+                                 check=True, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE)
+                  source[p] = out
+              except subprocess.CalledProcessError as err:
+                  warn("couldn't move the MP4's index to the front, uploaded as it is: %s" % err.stderr, p)
+
           entries, local = [], {}
           for p in files:
-              e = {"path": p, "sha256": sha256(p), "size": os.path.getsize(p)}
+              f = source.get(p, p)
+              e = {"path": p, "sha256": sha256(f), "size": os.path.getsize(f)}
               if vips and p in mentioned and os.path.splitext(p)[1].lower() in IMAGES:
                   try:
                       base = os.path.join(TMP, e["sha256"])
@@ -178,7 +223,7 @@ jobs:
           for s in plan.get("skipped", []):
               warn("Not synced: " + s["reason"], s["path"])
           for u in plan.get("uploads", []):
-              src = local.get((u["path"], u["width"])) if "width" in u else u["path"]
+              src = local.get((u["path"], u["width"])) if "width" in u else source.get(u["path"], u["path"])
               headers = dict(u["upload"]["headers"], **{"Content-Length": str(os.path.getsize(src)), "User-Agent": UA})
               with open(src, "rb") as body:
                   req = urllib.request.Request(u["upload"]["url"], data=body, method="PUT", headers=headers)
@@ -193,7 +238,7 @@ jobs:
           with open(os.environ["GITHUB_OUTPUT"], "a") as out:
               out.write("sync=%s\n" % plan["sync_id"])
           webp = sum(1 for e in entries if "versions" in e)
-          print("Synced %d media files (%d images as WebP); the app reads them through ongale-media.json." % (len(done["manifest"]), webp))
+          print("Synced %d media files (%d images as WebP, %d videos made to start fast); the app reads them through ongale-media.json." % (len(done["manifest"]), webp, len(source)))
           PY
       - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
         if: ${{ !inputs.media_only }}
@@ -249,7 +294,7 @@ jobs:
               "$ACTIONS_ID_TOKEN_REQUEST_URL&audience=https://api.ongale.com" | jq -r .value
           }
           # Every app this branch deploys gets the image (a web app, a worker, a cron job…).
-          ANSWER=$(jq -n --arg d "$DIGEST" --arg t "$REGISTRY_TOKEN" --arg m "$MEDIA_SYNC" '{digest: $d, registry_token: $t, media_sync: $m, workflow_version: 6}' |
+          ANSWER=$(jq -n --arg d "$DIGEST" --arg t "$REGISTRY_TOKEN" --arg m "$MEDIA_SYNC" '{digest: $d, registry_token: $t, media_sync: $m, workflow_version: 7}' |
             curl -sS --fail-with-body -X POST "https://api.ongale.com/v1/github/deploys" \
               -H "Authorization: Bearer $(oidc)" -H "Content-Type: application/json" -d @-)
           echo "$ANSWER" | jq -r '.skipped[]? | "::warning::App \(.app_id) was not deployed: \(.reason)"'
