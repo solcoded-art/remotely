@@ -1,0 +1,27 @@
+import type { Auth } from './types';
+
+export function serviceURL(raw: string) {
+  const url = new URL(raw);
+  if (url.username || url.password || url.search || url.hash || !['', '/'].includes(url.pathname)) throw Error('Use the server origin, such as https://remote.example.com.');
+  const local = ['localhost', '127.0.0.1', '[::1]'].includes(url.hostname);
+  if (url.protocol !== 'https:' && !(local && url.protocol === 'http:')) throw Error('Use HTTPS for your account server. HTTP is allowed only on localhost.');
+  return url.origin;
+}
+
+export async function request<T>(service: string, route: string, options: { token?: string; method?: string; data?: unknown } = {}): Promise<T> {
+  const response = await fetch(service + route, {
+    method: options.method || 'GET',
+    headers: { ...(options.data ? { 'Content-Type': 'application/json' } : {}), ...(options.token ? { Authorization: `Bearer ${options.token}` } : {}) },
+    body: options.data ? JSON.stringify(options.data) : undefined,
+    signal: AbortSignal.timeout(15000),
+  });
+  let data;
+  try { data = await response.json(); } catch { throw Error('The account server did not return JSON. Check its URL.'); }
+  if (!response.ok) throw Error(data.error || 'The request failed.');
+  return data;
+}
+
+export async function signIn(service: string, email: string, password: string, register: boolean) {
+  const result = await request<Omit<Auth, 'service'>>(service, `/api/auth/${register ? 'register' : 'login'}`, { method: 'POST', data: { email, password } });
+  return { ...result, service };
+}

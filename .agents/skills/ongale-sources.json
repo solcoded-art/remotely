@@ -1,0 +1,45 @@
+{
+  "retrieved": "2026-11-16",
+  "skills": [
+    {
+      "name": "ongale-app-ready",
+      "url": "https://ongale.com/skills/ongale-app-ready/SKILL.md",
+      "sha256": "6a3190f6525f11f2c98040bf4fd60a339899927258212e6b8b7c108cbaf6beb6"
+    },
+    {
+      "name": "ongale-continue-app",
+      "url": "https://ongale.com/skills/ongale-continue-app/SKILL.md",
+      "sha256": "d3130bb82259932e675c4b19875089541f14acbcd3e2cecc1add3e4c7f143b8c"
+    },
+    {
+      "name": "ongale-deploy",
+      "url": "https://ongale.com/skills/ongale-deploy/SKILL.md",
+      "sha256": "4c604bce1747849a4617d0de01abd837ac6f43c8d780f37a82684ca76c952d08"
+    },
+    {
+      "name": "ongale-email",
+      "url": "https://ongale.com/skills/ongale-email/SKILL.md",
+      "sha256": "dc086796cc9e859f2c01bc18cc074f7cd70f52482511b28115c616abb180fa6e"
+    },
+    {
+      "name": "ongale-fix-deploy",
+      "url": "https://ongale.com/skills/ongale-fix-deploy/SKILL.md",
+      "sha256": "844b2946d635662c71046caf8f2b69511885b53c6d9b9fa1c96d2f17376c98a3"
+    },
+    {
+      "name": "ongale-mcp",
+      "url": "https://ongale.com/skills/ongale-mcp/SKILL.md",
+      "sha256": "1f325a043fe017567efb6e8365970206d3dfffa8dfc848f33517adb9fff894ba"
+    },
+    {
+      "name": "ongale-media",
+      "url": "https://ongale.com/skills/ongale-media/SKILL.md",
+      "sha256": "16d4639db6d78d88cd3cb976bca57c60e0ca1eddfa3ea5884c86cf05b52464b6"
+    },
+    {
+      "name": "ongale-storage",
+      "url": "https://ongale.com/skills/ongale-storage/SKILL.md",
+      "sha256": "e2e969ba47f7c948d347f77fa96ece3bf3eb2b9e3e5a26d8323f1298471996ed"
+    }
+  ]
+}

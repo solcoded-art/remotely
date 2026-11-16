@@ -1,0 +1,93 @@
+{
+  "name": "ios-remote",
+  "productName": "Mac Remote",
+  "version": "0.2.0",
+  "private": true,
+  "description": "An account-paired iOS remote and Mac companion using WebRTC",
+  "main": "desktop/main.cjs",
+  "engines": {
+    "node": ">=22.13.0"
+  },
+  "scripts": {
+    "start": "node --env-file-if-exists=.env server.js",
+    "dev": "vite --host 127.0.0.1",
+    "build": "tsc --noEmit && vite build",
+    "preview": "vite preview --host 127.0.0.1",
+    "build:driver": "mkdir -p bin && swiftc -O -module-cache-path /private/tmp/ios-remote-swift-module-cache driver/mac_driver.swift -o bin/mac_driver",
+    "desktop": "npm run build && npm run build:driver && electron .",
+    "desktop:package": "npm run build && npm run build:driver && electron-builder --mac dir",
+    "desktop:dmg": "npm run build && npm run build:driver && electron-builder --mac dmg",
+    "ios:sync": "npm run build && cap sync ios",
+    "ios:open": "cap open ios",
+    "test": "node scripts/test-with-postgres.cjs node --test tests/commands.test.cjs tests/service.test.cjs tests/startup.test.cjs",
+    "test:ui": "node scripts/test-with-postgres.cjs node node_modules/@playwright/test/cli.js test",
+    "db:dev": "docker compose up -d --wait --wait-timeout 60 postgres",
+    "icons:ios": "swift -module-cache-path /private/tmp/ios-remote-swift-module-cache scripts/build-ios-icon.swift",
+    "test:image": "docker build -t ios-remote-ongale:local . && node scripts/smoke-image.cjs"
+  },
+  "keywords": [
+    "mac-remote",
+    "ios",
+    "screen-mirror",
+    "trackpad"
+  ],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@capacitor/core": "^8.0.0",
+    "@capacitor/ios": "^8.0.0",
+    "class-variance-authority": "^0.7.1",
+    "clsx": "^2.1.1",
+    "cn": "^0.5.2",
+    "lucide-react": "^0.577.0",
+    "pg": "^8.23.1",
+    "radix-ui": "^1.4.3",
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0",
+    "tailwind-merge": "^3.5.0",
+    "ws": "^8.18.0"
+  },
+  "devDependencies": {
+    "@capacitor/cli": "^8.0.0",
+    "@playwright/test": "^1.58.0",
+    "@tailwindcss/vite": "^4.2.0",
+    "@types/node": "^24.0.0",
+    "@types/react": "^19.2.0",
+    "@types/react-dom": "^19.2.0",
+    "@vitejs/plugin-react": "^5.1.0",
+    "electron": "^45.3.3",
+    "electron-builder": "^26.0.0",
+    "tailwindcss": "^4.2.0",
+    "typescript": "^5.9.3",
+    "vite": "^7.3.0"
+  },
+  "build": {
+    "appId": "com.macremote.companion",
+    "productName": "Mac Remote",
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "dist/**/*",
+      "desktop/**/*",
+      "shared/**/*",
+      "package.json"
+    ],
+    "extraResources": [
+      {
+        "from": "bin/mac_driver",
+        "to": "mac_driver"
+      }
+    ],
+    "mac": {
+      "icon": "public/icons/icon-512.png",
+      "category": "public.app-category.productivity",
+      "hardenedRuntime": true,
+      "entitlements": "desktop/entitlements.mac.plist",
+      "extendInfo": {
+        "NSScreenCaptureUsageDescription": "Share your selected Mac display with your signed-in iPhone.",
+        "NSAccessibilityUsageDescription": "Control your Mac from an approved remote session."
+      }
+    }
+  }
+}

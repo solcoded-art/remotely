@@ -1,0 +1,16 @@
+node_modules
+dist
+release
+artifacts
+test-results
+playwright-report
+ios
+bin
+driver
+desktop
+tests
+.agents
+.git
+.env
+.env.*
+!.env.example
