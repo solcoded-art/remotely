@@ -2,6 +2,10 @@
 # No Dockerfile needed (Railpack detects the stack); if you add one, it's used instead.
 # Deploying needs no stored secret: GitHub's OIDC token proves this repo and branch.
 name: Deploy to Ongale
+# A media-only run (after a rollback) is named so; Ongale's build status
+# ignores it, since it builds and deploys nothing (APP-26). Other runs start
+# with "Deploy: ", so no commit message can take that name.
+run-name: "${{ inputs.media_only && 'Ongale media sync' || format('Deploy: {0}', github.event.head_commit.message || 'started by Ongale') }}"
 
 on:
   push:
@@ -61,7 +65,7 @@ jobs:
 
           # Ongale's API is behind Cloudflare, which refuses Python's default
           # User-Agent ("Python-urllib", error 1010): every request names itself.
-          UA = "ongale-deploy-workflow/7"
+          UA = "ongale-deploy-workflow/8"
 
           def warn(msg, path=None):
               print("::warning%s::%s" % (" file=" + path if path else "", msg))
@@ -293,23 +297,45 @@ jobs:
             curl -fsS -H "Authorization: bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" \
               "$ACTIONS_ID_TOKEN_REQUEST_URL&audience=https://api.ongale.com" | jq -r .value
           }
+          ESC='def esc: tostring | gsub("%";"%25") | gsub("\r";"%0D") | gsub("\n";"%0A");'
+          ongale() {
+            local out=$1 method=$2 path=$3 code
+            shift 3
+            if ! code=$(curl -sS -o "$out" -w '%{http_code}' -X "$method" "https://api.ongale.com$path" -H "Authorization: Bearer $(oidc)" "$@"); then
+              echo "::error title=Couldn't reach Ongale::$method $path didn't get an answer; run the workflow again."
+              return 1
+            fi
+            if [ "$code" -ge 400 ]; then
+              { jq -er '.message // .error' "$out" 2>/dev/null || head -c 500 "$out"; } |
+                jq -Rrs "$ESC"'"::error title=Ongale refused the deploy (HTTP '"$code"')::\(esc)"'
+              return 1
+            fi
+          }
           # Every app this branch deploys gets the image (a web app, a worker, a cron job…).
-          ANSWER=$(jq -n --arg d "$DIGEST" --arg t "$REGISTRY_TOKEN" --arg m "$MEDIA_SYNC" '{digest: $d, registry_token: $t, media_sync: $m, workflow_version: 7}' |
-            curl -sS --fail-with-body -X POST "https://api.ongale.com/v1/github/deploys" \
-              -H "Authorization: Bearer $(oidc)" -H "Content-Type: application/json" -d @-)
-          echo "$ANSWER" | jq -r '.skipped[]? | "::warning::App \(.app_id) was not deployed: \(.reason)"'
+          jq -n --arg d "$DIGEST" --arg t "$REGISTRY_TOKEN" --arg m "$MEDIA_SYNC" '{digest: $d, registry_token: $t, media_sync: $m, workflow_version: 8}' > "$RUNNER_TEMP/deploy.json"
+          ongale "$RUNNER_TEMP/answer.json" POST /v1/github/deploys -H "Content-Type: application/json" -d @"$RUNNER_TEMP/deploy.json" || exit 1
+          ANSWER=$(cat "$RUNNER_TEMP/answer.json")
+          echo "$ANSWER" | jq -r "$ESC"'.skipped[]? | "::warning title=Not deployed::\(.reason | esc)"'
+          echo "$ANSWER" | jq -r '.app_urls[]? | "App page: \(.)"'
+          echo "$ANSWER" | jq -r '.queued[]? | "Another deploy of this app is in progress; this one starts after it. \(.app_url // "")"'
           FAILED=0
-          for RELEASE in $(echo "$ANSWER" | jq -r '(.releases // [.release])[]'); do
+          # Each app's deploy request (or, from an older Ongale, its release). A
+          # queued one waits for the app's current deploy, so this job (whose
+          # token lets Ongale pull a private image) waits up to 30 minutes.
+          for ID in $(echo "$ANSWER" | jq -r 'if ((.requests // []) | length) > 0 then .requests[] else (.releases // [.release])[] end'); do
             STATUS=pulling
-            for _ in $(seq 1 120); do
-              STATUS=$(curl -fsS "https://api.ongale.com/v1/github/deploys/$RELEASE" -H "Authorization: Bearer $(oidc)" | jq -r .status || true)
-              [ "$STATUS" = pulled ] || [ "$STATUS" = failed ] && break
+            for _ in $(seq 1 360); do
+              POLL=$(curl -fsS "https://api.ongale.com/v1/github/deploys/$ID" -H "Authorization: Bearer $(oidc)" || true)
+              STATUS=$(echo "$POLL" | jq -r '.status // empty' 2>/dev/null || true)
+              case "$STATUS" in pulled|failed|superseded) break ;; esac
               sleep 5
             done
             case "$STATUS" in
-              pulled) echo "Ongale pulled the image for release $RELEASE; the rest of the deploy shows on the app page." ;;
-              failed) echo "::error::A deploy stopped (release $RELEASE). The app page in Ongale says why."; FAILED=1 ;;
-              *) echo "::warning::Ongale hasn't pulled the image for release $RELEASE after 10 minutes; check the app page." ;;
+              pulled) echo "Ongale pulled the image ($ID); the rest of the deploy shows on the app page." ;;
+              superseded) echo "A newer push or change replaced this deploy before it started ($ID)." ;;
+              failed) echo "$POLL" | jq -r "$ESC"'"::error title=The deploy stopped::\(.detail // "The app page in Ongale says why." | esc)"'; FAILED=1 ;;
+              queued) echo "::warning::This deploy is still waiting for the app's current one after 30 minutes; it will start when that one ends, but a private image may no longer pull. Check the app page." ;;
+              *) echo "::warning::Ongale hasn't pulled the image ($ID) after 30 minutes; check the app page." ;;
             esac
           done
           exit $FAILED
