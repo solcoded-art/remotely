@@ -9,12 +9,16 @@ export function serviceURL(raw: string) {
 }
 
 export async function request<T>(service: string, route: string, options: { token?: string; method?: string; data?: unknown } = {}): Promise<T> {
-  const response = await fetch(service + route, {
+  let response: Response;
+  try { response = await fetch(service + route, {
     method: options.method || 'GET',
     headers: { ...(options.data ? { 'Content-Type': 'application/json' } : {}), ...(options.token ? { Authorization: `Bearer ${options.token}` } : {}) },
     body: options.data ? JSON.stringify(options.data) : undefined,
     signal: AbortSignal.timeout(15000),
-  });
+  }); } catch (error) {
+    if (error instanceof DOMException && ['TimeoutError', 'AbortError'].includes(error.name)) throw Error('The account server took too long to respond. Check your connection and try again.');
+    throw Error('Unable to reach the account server. Check your internet connection and the account server URL, then try again.');
+  }
   let data;
   try { data = await response.json(); } catch { throw Error('The account server did not return JSON. Check its URL.'); }
   if (!response.ok) throw Error(data.error || 'The request failed.');

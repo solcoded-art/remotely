@@ -62,6 +62,12 @@ All eight official Ongale skills are installed in `.agents/skills/`. The root Do
 
 Read [Ongale deployment](docs/ongale-deployment.md), [native distribution](docs/distribution.md), and [validation limits](docs/validation.md). `.mcp.json` declares the Ongale MCP endpoint for compatible clients; it does not establish a signed-in connection. No live resources have been created.
 
+## UI foundations and hardening
+
+The setup and connection journey uses shared shadcn/ui components, locally bundled Satoshi, explicit permission/approval/playback states, and pointer/scroll alternatives to gestures. Both development and production builds fetch the pinned font when needed; see [font provenance and licensing](docs/hardening/fonts.md). Font binaries are excluded from this repository.
+
+See the [hardening milestone](docs/hardening/README.md), [security/accessibility backlog](docs/hardening/baseline.md), [threat model](docs/hardening/threat-model.md), and [validation evidence](docs/hardening/validation.md). Automated accessibility checks are included in the browser suite; they do not establish complete ADA/WCAG compliance. Remote desktop screen-reader semantics remain outstanding.
+
 ## Current beta limits
 
 Login uses email and a password of at least 12 characters. Client tokens are held in memory, so relaunching requires login. Email verification, password recovery, MFA, unattended access, audio forwarding, background phone sessions, and file transfer are not implemented. One active controller per Mac is supported. Accounts and devices persist in PostgreSQL; live sessions end on server restart.

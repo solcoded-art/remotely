@@ -1,0 +1,61 @@
+import { test, expect } from '@playwright/test';
+import { expectAccessible } from './fixtures/accessibility';
+import { installMacFixture } from './fixtures/mac';
+import { login } from './fixtures/account';
+
+test('login and documentation reflow with enlarged text and expose keyboard navigation', async ({ page }) => {
+  await page.setViewportSize({ width: 320, height: 568 });
+  await page.goto('/');
+  await page.keyboard.press('Tab');
+  await expect(page.getByRole('link', { name: 'Skip to main content' })).toBeFocused();
+  await page.keyboard.press('Enter');
+  await expect(page.locator('main')).toBeFocused();
+  await page.evaluate(() => document.fonts.ready);
+  expect(await page.evaluate(() => [...document.fonts].some(font => font.family === 'Satoshi' && font.status === 'loaded'))).toBe(true);
+  await expectAccessible(page);
+  await page.getByRole('button', { name: 'Advanced connection settings' }).click();
+  await expect(page.getByLabel('Account server URL')).toBeVisible();
+  await expectAccessible(page);
+  await page.addStyleTag({ content: 'html { font-size: 200% !important; } * { line-height: 1.5 !important; letter-spacing: .12em !important; word-spacing: .16em !important; } p { margin-bottom: 2em !important; }' });
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1), JSON.stringify(await page.evaluate(() => [...document.querySelectorAll('body *')].filter(element => element.getBoundingClientRect().right > innerWidth + 1).map(element => ({ tag: element.tagName, className: element.className, width: element.getBoundingClientRect().width }))))).toBe(true);
+  await page.route('**/api/downloads/mac', route => route.fulfill({ json: { available: false } }));
+  await page.goto('/docs/getting-started/');
+  await expectAccessible(page);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1)).toBe(true);
+});
+
+test('network failures offer actionable sign-in recovery without discarding email', async ({ page }) => {
+  await page.goto('/');
+  await page.route('**/api/auth/login', route => route.abort('failed'));
+  await page.getByLabel('Email address').fill('network-test@example.com');
+  await page.getByLabel('Password', { exact: true }).fill('test-password-long-enough');
+  await page.getByRole('button', { name: 'Sign in', exact: true }).click();
+  await expect(page.getByRole('alert')).toContainText('Check your internet connection');
+  await expect(page.getByLabel('Email address')).toHaveValue('network-test@example.com');
+  await expect(page.getByRole('button', { name: 'Sign in', exact: true })).toBeEnabled();
+  await expectAccessible(page);
+});
+
+test('Mac checklist detects missing permission and refreshes after returning from Settings', async ({ browser }) => {
+  const context = await browser.newContext({ viewport: { width: 620, height: 820 } });
+  await installMacFixture(context, { permissions: { accessibility: false, screen: 'denied' } });
+  const page = await context.newPage();
+  try {
+    await login(page, `permissions-${Date.now()}@example.com`, true);
+    await expect(page.getByText('Setup needed', { exact: true })).toBeVisible();
+    await expect(page.getByText('Finish the checklist before approving a connection.', { exact: true })).toBeVisible();
+    await page.getByRole('button', { name: 'Choose display', exact: true }).click();
+    await page.getByRole('button', { name: 'Main display', exact: true }).click();
+    await expect(page.getByText('Ready for a request', { exact: true })).toHaveCount(0);
+    await expectAccessible(page);
+    await page.evaluate(() => { (window as any).macTest.permissions = { accessibility: true, screen: 'granted' }; window.dispatchEvent(new Event('focus')); });
+    await expect(page.getByText('Ready for a request', { exact: true })).toBeVisible();
+    await expectAccessible(page);
+    await page.getByRole('button', { name: 'Account settings' }).click();
+    await expect(page.getByRole('dialog')).toBeVisible();
+    await expectAccessible(page);
+    await page.keyboard.press('Escape');
+    await expect(page.getByRole('button', { name: 'Account settings' })).toBeFocused();
+    await page.screenshot({ path: 'artifacts/setup-milestone-mac.png', fullPage: true });
+  } finally { await context.close(); }
+});

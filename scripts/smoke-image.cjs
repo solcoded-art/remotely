@@ -51,10 +51,17 @@ async function main() {
       page.on('response', response => { if (response.url().includes('/assets/') && !response.ok()) errors.push('Asset failed: ' + response.status()); });
       await page.goto(url, { waitUntil: 'networkidle' });
       await page.getByRole('heading', { name: 'Welcome back' }).waitFor();
-      assert.equal(await page.locator('body').evaluate(body => getComputedStyle(body).backgroundColor), 'rgb(16, 17, 19)');
+      await page.evaluate(() => document.fonts.ready);
+      assert.equal(await page.evaluate(() => [...document.fonts].some(font => font.family === 'Satoshi' && font.status === 'loaded')), true);
       assert.deepEqual(errors, []);
       fs.mkdirSync('artifacts', { recursive: true });
       await page.screenshot({ path: 'artifacts/production-build.png', fullPage: true });
+      const guide = await fetch(url + '/docs/getting-started', { redirect: 'manual' });
+      assert.equal(guide.status, 308);
+      await page.goto(url + '/docs/getting-started/', { waitUntil: 'networkidle' });
+      await page.getByRole('heading', { name: 'Get your Mac ready to connect' }).waitFor();
+      assert.deepEqual(errors, []);
+      await page.screenshot({ path: 'artifacts/production-docs.png', fullPage: true });
     } finally { await browser.close(); }
     phase = 'account registration';
     const authResponse = await fetch(url + '/api/auth/register', { method: 'POST', headers: { 'Content-Type': 'application/json', Origin: url }, body: JSON.stringify({ email: 'image-test@example.com', password: 'image-smoke-password-123' }) });

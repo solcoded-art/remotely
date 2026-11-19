@@ -1,0 +1,41 @@
+{
+  "retrieved": "2026-11-19",
+  "hashMethod": "SHA-256 of raw downloaded UTF-8 bytes",
+  "scope": "Guidance reviewed for this milestone; no Strix execution or Snyk scan/remediation occurred. Supplied computedHash values do not match raw upstream byte hashes; record the difference rather than asserting exact-version equivalence.",
+  "skills": [
+    {
+      "name": "owasp-top-10-testing",
+      "source": "usestrix/strix",
+      "commit": "8db295a5b3564be2b430bb3a9afdb4db7850fa24",
+      "skillPath": "skills/owasp-top-10-testing/SKILL.md",
+      "url": "https://github.com/usestrix/strix/blob/8db295a5b3564be2b430bb3a9afdb4db7850fa24/skills/owasp-top-10-testing/SKILL.md",
+      "suppliedComputedHash": "da33339f2d052ea5445b9fb7fc75e3fe4dd9eafc51ea8141e2b3ceab722fbe0e",
+      "retrievedSha256": "02b1cbe60d40c44493309418c7824f1f681d9f32bf0299ca246892c46cb130af",
+      "matchesSuppliedRawSha256": false
+    },
+    {
+      "name": "snyk-fix",
+      "source": "snyk/studio-recipes",
+      "commit": "3752dd05a462184dcce44af3c247f287b41e35de",
+      "skillPath": "command_directives/synchronous_remediation/skills/snyk-fix/SKILL.md",
+      "url": "https://github.com/snyk/studio-recipes/blob/3752dd05a462184dcce44af3c247f287b41e35de/command_directives/synchronous_remediation/skills/snyk-fix/SKILL.md",
+      "suppliedComputedHash": "2b653b0e26284038805b218ab96e9bfa57f8214e5e5558a43d25ab490f431d14",
+      "retrievedSha256": "012bfa1bcb58cb5a00eb3844cdfd280ca9dfa8389b762dcbbe88ce1136f233df",
+      "matchesSuppliedRawSha256": false
+    },
+    {
+      "name": "solid-principles",
+      "source": "TheBeardedBearSAS/bear-craft",
+      "commit": "a408cd303a75c7e368ccc311a147c895051023e7",
+      "skillPath": ".claude/skills/solid-principles/SKILL.md",
+      "url": "https://github.com/TheBeardedBearSAS/bear-craft/blob/a408cd303a75c7e368ccc311a147c895051023e7/.claude/skills/solid-principles/SKILL.md",
+      "suppliedComputedHash": "535288c39c73e2034a0bc7e5ebd3247d65ab5875fc864d9fdb0888a8f1a85c33",
+      "retrievedSha256": "ee89196ae8f91d3e3fd78314a7c68dedc6de4f8a5781354c09fdf36f737f05ae",
+      "matchesSuppliedRawSha256": false,
+      "reference": {
+        "path": ".claude/skills/solid-principles/REFERENCE.md",
+        "sha256": "920a836786cd7efd6d35d01e051a280c7c32bbba31bf38e070f92d14966a0b04"
+      }
+    }
+  ]
+}

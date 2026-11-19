@@ -2,15 +2,15 @@ import { request } from './api';
 import type { Auth, Command, Device, DriverEvent, RunningApp, ServerMessage, Signal } from './types';
 
 type Session = { id: string; name: string };
-type Snapshot = {
+export type ConnectionSnapshot = {
   ready: boolean; status: 'offline' | 'connecting' | 'ready' | 'pending' | 'negotiating' | 'connected';
   devices: Device[]; pending: Session | null; session: Session | null; error: string;
   stream: MediaStream | null; apps: RunningApp[]; route: string; latency: number | null;
 };
-const initial: Snapshot = { ready: false, status: 'connecting', devices: [], pending: null, session: null, error: '', stream: null, apps: [], route: '', latency: null };
+const initial: ConnectionSnapshot = { ready: false, status: 'connecting', devices: [], pending: null, session: null, error: '', stream: null, apps: [], route: '', latency: null };
 
 export class Connection {
-  private value: Snapshot = { ...initial };
+  private value: ConnectionSnapshot = { ...initial };
   private listeners = new Set<() => void>();
   private ws: WebSocket | null = null;
   private pc: RTCPeerConnection | null = null;
@@ -33,7 +33,7 @@ export class Connection {
   constructor(readonly auth: Auth) {}
   snapshot = () => this.value;
   subscribe = (fn: () => void) => { this.listeners.add(fn); return () => { this.listeners.delete(fn); }; };
-  private update(data: Partial<Snapshot>) { this.value = { ...this.value, ...data }; this.listeners.forEach(fn => fn()); }
+  private update(data: Partial<ConnectionSnapshot>) { this.value = { ...this.value, ...data }; this.listeners.forEach(fn => fn()); }
   clearError = () => this.update({ error: '' });
   report = (error: unknown) => this.update({ error: error instanceof Error ? error.message : String(error) });
 
@@ -50,6 +50,12 @@ export class Connection {
       this.openSocket();
     } catch (error) { this.update({ status: 'offline' }); this.report(error); }
   }
+  retry = () => {
+    if (this.disposed || this.ws?.readyState === WebSocket.OPEN || this.ws?.readyState === WebSocket.CONNECTING) return;
+    clearTimeout(this.reconnectTimer);
+    if (!this.ws) void this.start();
+    else this.openSocket();
+  };
   private openSocket() {
     if (this.disposed) return;
     this.update({ ready: false, status: 'connecting' });
@@ -134,7 +140,7 @@ export class Connection {
     };
     pc.onconnectionstatechange = () => {
       if (this.pc !== pc) return;
-      if (pc.connectionState === 'failed') { this.report(Error('Peer connection failed. Configure a TURN relay for connections across different networks.')); this.end(); }
+      if (pc.connectionState === 'failed') { this.report(Error('Could not connect to your Mac. Check both devices’ internet connections and try again. If it keeps failing across networks, see the setup guide.')); this.end(); }
       if (pc.connectionState === 'disconnected') this.update({ status: 'negotiating', route: 'Reconnecting peer…' });
       if (pc.connectionState === 'connected' && this.channel?.readyState === 'open') this.update({ status: 'connected' });
     };
@@ -146,7 +152,7 @@ export class Connection {
       await pc.setLocalDescription(offer);
       signal({ type: 'offer', sdp: offer.sdp! });
     } else pc.ondatachannel = event => this.setupChannel(event.channel);
-    this.negotiationTimer = setTimeout(() => { if (this.pc === pc && this.value.status !== 'connected') { this.report(Error('Connection timed out. Check Mac permissions and TURN configuration.')); this.end(); } }, 25000);
+    this.negotiationTimer = setTimeout(() => { if (this.pc === pc && this.value.status !== 'connected') { this.report(Error('Connection timed out. Check the Mac permissions and both internet connections, then try again. See the setup guide if the devices are on different networks.')); this.end(); } }, 25000);
   }
   private async signal(signal: Signal) {
     const pc = this.pc;

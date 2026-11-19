@@ -4,6 +4,7 @@ const path = require('node:path');
 const { randomUUID, createHmac } = require('node:crypto');
 const { WebSocketServer } = require('ws');
 const { createStore } = require('./store.cjs');
+const { createDownloads } = require('./downloads.cjs');
 
 const defaults = ['capacitor://localhost', 'app://macremote', 'http://localhost', 'http://127.0.0.1:5173', 'http://localhost:5173', 'http://127.0.0.1:3000', 'http://localhost:3000'];
 const fail = (status, message) => Object.assign(new Error(message), { status });
@@ -33,6 +34,7 @@ async function createService(options = {}) {
     } catch { return false; }
   }
   const publicDir = path.resolve(__dirname, '../dist');
+  const downloads = createDownloads();
   const peers = new Map();
   const sessions = new Map();
   const buckets = new Map();
@@ -98,15 +100,17 @@ async function createService(options = {}) {
     if (req.method === 'OPTIONS') { res.writeHead(204); return res.end(); }
     try {
       const route = new URL(req.url, 'http://localhost').pathname;
+      if (await downloads.handle(route, req, res)) return;
       if (['/api/health', '/health'].includes(route) && req.method === 'GET') return json(200, { status: 'ok' });
+      if (req.method === 'GET' && route === '/docs/getting-started') { res.writeHead(308, { Location: '/docs/getting-started/' }); res.end(); return; }
       if (req.method === 'GET' && !route.startsWith('/api/') && route !== '/ws') {
-        const relative = route === '/' ? '/index.html' : decodeURIComponent(route);
+        const relative = route === '/' ? '/index.html' : route === '/docs/getting-started/' ? '/docs/getting-started/index.html' : decodeURIComponent(route);
         const file = path.resolve(publicDir, '.' + relative);
         if (!file.startsWith(publicDir + path.sep)) throw fail(403, 'Forbidden.');
         try {
           const stat = await fs.promises.stat(file);
           if (!stat.isFile()) throw Error();
-          const types = { '.html': 'text/html; charset=utf-8', '.css': 'text/css; charset=utf-8', '.js': 'application/javascript; charset=utf-8', '.svg': 'image/svg+xml', '.png': 'image/png' };
+          const types = { '.html': 'text/html; charset=utf-8', '.css': 'text/css; charset=utf-8', '.js': 'application/javascript; charset=utf-8', '.svg': 'image/svg+xml', '.png': 'image/png', '.woff2': 'font/woff2' };
           res.setHeader('Content-Security-Policy', "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; media-src 'self' blob:; connect-src 'self' https: wss: http://127.0.0.1:* ws://127.0.0.1:* http://localhost:* ws://localhost:*; frame-ancestors 'none'; base-uri 'none'; object-src 'none'");
           if (route.startsWith('/assets/')) res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
           res.writeHead(200, { 'Content-Type': types[path.extname(file)] || 'application/octet-stream', 'Content-Length': stat.size });

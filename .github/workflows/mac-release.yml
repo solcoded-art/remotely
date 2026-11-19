@@ -1,0 +1,41 @@
+# The Mac installer is independent of Ongale's Linux web deployment.
+name: Publish Mac installer
+on:
+  push:
+    tags: ['mac-v*']
+permissions:
+  contents: write
+concurrency:
+  group: mac-installer-${{ github.ref }}
+  cancel-in-progress: false
+jobs:
+  release:
+    runs-on: macos-15
+    timeout-minutes: 30
+    env:
+      CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '24'
+          cache: npm
+      - name: Validate release version and architecture
+        run: |
+          test "$(uname -m)" = arm64
+          node -e "const a=require('./release.config.json'),p=require('./package.json'); if(a.version!==p.version || process.env.GITHUB_REF_NAME!=='mac-v'+p.version) process.exit(1)"
+      - run: npm ci
+      - name: Build Apple Silicon app
+        run: npm run desktop:package
+      - name: Package installer and checksum
+        run: |
+          VERSION=$(node -p "require('./package.json').version")
+          ditto -c -k --sequesterRsrc --keepParent 'release/mac-arm64/Mac Remote.app' "release/MacRemote-${VERSION}-mac-arm64.zip"
+          cd release
+          shasum -a 256 "MacRemote-${VERSION}-mac-arm64.zip" > SHA256SUMS
+      - name: Publish developer beta
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          VERSION=$(node -p "require('./package.json').version")
+          gh release create "$GITHUB_REF_NAME" "release/MacRemote-${VERSION}-mac-arm64.zip" release/SHA256SUMS --verify-tag --prerelease --title "Mac Remote ${VERSION} developer beta" --notes-file docs/mac-release-notes.md

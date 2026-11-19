@@ -6,9 +6,10 @@ test('native desktop shell boots with isolated renderer and authenticated API ac
   const app = await electron.launch({ args: [path.resolve('.')], env: { ...process.env, ELECTRON_RUN_AS_NODE: undefined } as unknown as Record<string, string> });
   try {
     const page = await app.firstWindow();
-    await expect(page.getByText('Mac companion', { exact: true })).toBeVisible();
+    await expect(page.getByText('Mac app', { exact: true })).toBeVisible();
     expect(await page.evaluate(() => typeof (window as any).require)).toBe('undefined');
     expect(await page.evaluate(() => (window as any).macRemote.platform)).toBe('mac');
+    await page.getByRole('button', { name: 'Advanced connection settings' }).click();
     await page.getByLabel('Account server URL').fill('http://127.0.0.1:3000');
     await page.getByRole('button', { name: 'Create an account', exact: true }).click();
     await page.getByLabel('Email address').fill(`native-${Date.now()}@example.com`);

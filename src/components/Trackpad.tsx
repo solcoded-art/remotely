@@ -1,11 +1,12 @@
 import { useEffect, useRef, useState } from 'react';
-import { Hand, MousePointer2, MousePointerClick } from 'lucide-react';
+import { ArrowDown, ArrowLeft, ArrowRight, ArrowUp, Hand, MousePointer2, MousePointerClick } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import type { Command } from '@/lib/types';
 
 export function Trackpad({ connected, send }: { connected: boolean; send(command: Command): boolean }) {
+  const [step, setStep] = useState(20);
   const [drag, setDrag] = useState(false);
-  const [sensitivity, setSensitivity] = useState(() => Number(localStorage.getItem('macremote.sensitivity')) || 1.4);
+  const [sensitivity, setSensitivity] = useState(() => { const saved = Number(localStorage.getItem('macremote.sensitivity')); return Number.isFinite(saved) && saved >= 0.5 && saved <= 3 ? saved : 1.4; });
   const gesture = useRef({ last: { x: 0, y: 0 }, start: 0, moved: 0, fingers: 0, cancelled: false });
   const active = useRef(new Map<number, { x: number; y: number }>());
   const pending = useRef({ dx: 0, dy: 0, scroll: false, frame: 0 });
@@ -29,8 +30,11 @@ export function Trackpad({ connected, send }: { connected: boolean; send(command
     pending.current = { dx: 0, dy: 0, scroll, frame: 0 };
     if (dx || dy) send({ action: scroll ? 'scroll' : dragRef.current ? 'drag' : 'move', dx: scroll ? -dx * 1.5 : dx, dy: scroll ? -dy * 1.5 : dy });
   }
+  function nudge(dx: number, dy: number) {
+    if (connected) send({ action: dragRef.current ? 'drag' : 'move', dx: dx * step, dy: dy * step });
+  }
   return <>
-    <div className={`trackpad ${connected ? '' : 'disabled'}`} aria-label="Remote trackpad"
+    <div className={`trackpad ${connected ? '' : 'disabled'}`} role="group" aria-label="Gesture trackpad"
       onPointerDown={event => {
         if (!connected) return;
         event.preventDefault(); event.currentTarget.setPointerCapture(event.pointerId);
@@ -59,8 +63,20 @@ export function Trackpad({ connected, send }: { connected: boolean; send(command
         if (!active.current.size && !gesture.current.cancelled && gesture.current.moved < 12 && Date.now() - gesture.current.start < 300 && !dragRef.current) send({ action: 'click', button: gesture.current.fingers >= 2 ? 'right' : 'left' });
       }}
       onPointerCancel={release}>
-      <MousePointer2 size={22} strokeWidth={1.3} /><span>Move with one finger</span><span className="text-[10px] text-muted-foreground">Two fingers to scroll · tap to click</span>
+      <MousePointer2 size={22} strokeWidth={1.3} /><span>Move with one finger</span><span className="text-sm text-muted-foreground">Two fingers to scroll · tap to click</span>
     </div>
+    <fieldset className="pointer-controls" disabled={!connected}>
+      <legend>Move the pointer without gestures</legend>
+      <p className="field-hint">Choose a step size, then press a direction. Turn on Hold to drag, move with these buttons, then release.</p>
+      <label className="field">Pointer step<select className="rounded-md border border-input bg-background px-3 text-sm" value={step} onChange={event => setStep(Number(event.target.value))}>{[1, 5, 20, 50].map(value => <option key={value} value={value}>{value} {value === 1 ? 'pixel' : 'pixels'}</option>)}</select></label>
+      <div className="pointer-pad">
+        <Button className="pointer-up" variant="outline" aria-label="Move pointer up" onClick={() => nudge(0, -1)}><ArrowUp aria-hidden="true" /></Button>
+        <Button className="pointer-left" variant="outline" aria-label="Move pointer left" onClick={() => nudge(-1, 0)}><ArrowLeft aria-hidden="true" /></Button>
+        <Button className="pointer-down" variant="outline" aria-label="Move pointer down" onClick={() => nudge(0, 1)}><ArrowDown aria-hidden="true" /></Button>
+        <Button className="pointer-right" variant="outline" aria-label="Move pointer right" onClick={() => nudge(1, 0)}><ArrowRight aria-hidden="true" /></Button>
+      </div>
+      <div className="grid grid-cols-2 gap-2 mt-3">{([['Scroll up', 0, 80], ['Scroll down', 0, -80], ['Scroll left', 80, 0], ['Scroll right', -80, 0]] as const).map(([label, dx, dy]) => <Button variant="outline" key={label} onClick={() => send({ action: 'scroll', dx, dy })}>{label}</Button>)}</div>
+    </fieldset>
     <div className="mt-3 grid grid-cols-2 gap-2">
       <Button variant="secondary" disabled={!connected} onClick={() => send({ action: 'click', button: 'left' })}><MousePointerClick />Left click</Button>
       <Button variant="secondary" disabled={!connected} onClick={() => send({ action: 'click', button: 'right' })}>Right click</Button>

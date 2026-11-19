@@ -23,3 +23,16 @@ The real native project is `ios/App/App.xcodeproj`, generated with Capacitor 8 a
 No signing team, signing certificate, App Store Connect app, privacy policy URL, or TestFlight invitation has been configured. Do not call the app App Store ready until those steps and device tests are completed. Passwords are scrypt-hashed, session tokens are stored as hashes on the server, and WebRTC encrypts video/data transport; the signaling service still handles login credentials over HTTPS and connection metadata. Do not claim protection against a compromised signaling server without an independently verified peer-identity layer.
 
 References: [Capacitor iOS requirements](https://capacitorjs.com/docs/ios), [Apple TestFlight](https://developer.apple.com/testflight/), [Electron screen capture](https://www.electronjs.org/docs/latest/api/desktop-capturer/).
+
+
+## Public website onboarding and Mac downloads
+
+The public login page and no-device state keep a short Mac-app requirement notice linking to `/docs/getting-started/`. The dedicated documentation page contains the installer download, requirements, setup steps, permissions, and troubleshooting without requiring an account. On phones, it offers a setup-page link to open on the Mac. Header Documentation links open the guide in a new tab so an existing account view is preserved. The guide is a separate Vite HTML entry with correctly resolved assets and a canonical trailing-slash URL, served by the production Node process.
+
+`release.config.json` pins the exact public GitHub Release asset. `/api/downloads/mac` checks that the asset exists and is a binary download; `/download/mac` redirects only when it is available. Until then the UI displays an unavailable state and Retry rather than a broken download link. Release checks are coalesced and cached for up to one minute. This does not use Ongale Media, which does not sync installer ZIP files.
+
+The independent `.github/workflows/mac-release.yml` runs only for a pushed `mac-v*` tag. It checks the package/manifest version, uses an ARM64 macOS runner, builds the Mac app and Swift helper for macOS 13+, packages the ZIP with SHA256SUMS, and publishes a clearly labeled unsigned developer prerelease. It does not modify Ongale's managed deployment workflow. Publishing a new installer requires updating the package version and manifest together, committing, and explicitly pushing the matching tag; a normal main-branch push alone does not publish an installer.
+
+The first public download is planned as `mac-v0.2.2`. Until that tag workflow has completed successfully and its release asset is publicly accessible, the site must not claim the installer is downloadable. A signed consumer installer remains dependent on Apple signing/notarization setup.
+
+Runner architecture reference: https://docs.github.com/en/actions/reference/runners/github-hosted-runners
