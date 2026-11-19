@@ -1,17 +1,9 @@
 import * as React from "react"
+import { HaloCard } from "@/components/ui/halo-card"
 import { cn } from "@/lib/utils"
 
-function Card({ className, ...props }: React.ComponentProps<"div">) {
-  return (
-    <div
-      data-slot="card"
-      className={cn(
-        "flex flex-col gap-6 rounded-xl border bg-card py-6 text-card-foreground shadow-sm",
-        className
-      )}
-      {...props}
-    />
-  )
+function Card({ className, children, ...props }: React.ComponentProps<"div">) {
+  return <HaloCard data-slot="card" className={cn("remotely-card", className)} padding="none" translucent={false} interactive={false} children={children} {...props} />
 }
 
 function CardHeader({ className, ...props }: React.ComponentProps<"div">) {

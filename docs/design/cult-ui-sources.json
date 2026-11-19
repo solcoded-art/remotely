@@ -1,0 +1,43 @@
+{
+  "installation": "https://www.cult-ui.com/docs/installation",
+  "components": [
+    {
+      "name": "halo-button",
+      "url": "https://www.cult-ui.com/r/halo-button.json",
+      "retrieved": "2026-11-19",
+      "registrySha256": "418e62428d0ec6f839209c57d6c6ab9799137021211e397a01b1b2b3b14ea7d0",
+      "sourceSha256": "219a9568613a4c730cc66a59d14d295ffbb1de5d10c1a46f28abb6e438d5e918",
+      "local": "src/components/ui/halo-button.tsx",
+      "localSha256": "5ee031cb9a3cfaa217132467f935b13abc3bfc77e6b02f5cd7cad093d9b6aea2",
+      "adaptations": [
+        "Source attribution header",
+        "Optional animateLayout prop; disabled by the form-action adapter to keep hit targets stable"
+      ]
+    },
+    {
+      "name": "halo-card",
+      "url": "https://www.cult-ui.com/r/halo-card.json",
+      "retrieved": "2026-11-19",
+      "registrySha256": "76c522d818199aab7ca0ef999852f5c2d4edf71b0dad0203e5b98972a3d7e2b8",
+      "sourceSha256": "a237b203bbcd5868cff3ee4bd44f955fd314adba3bb58ec5b0eef84ef8906059",
+      "local": "src/components/ui/halo-card.tsx",
+      "localSha256": "dd396693d13152f8be3230c1244be634ed2c38ff0ce3db4ab03cb31ab339269f",
+      "adaptations": [
+        "Source attribution header"
+      ]
+    },
+    {
+      "name": "halo-input",
+      "url": "https://www.cult-ui.com/r/halo-input.json",
+      "retrieved": "2026-11-19",
+      "registrySha256": "4d398bdc765d131474125e1d81b219723e7fc762c3c275705ab1fe07cb6808c4",
+      "sourceSha256": "4a7a48c35f916285c2f2f03dcae577831b3ed44cd127928c75f11fb82332bf85",
+      "local": "src/components/ui/halo-input.tsx",
+      "localSha256": "199ea9907548b9d259c78b167b083542cba5450c4aba77b4808b7e46c06a0cd0",
+      "adaptations": [
+        "Source attribution header"
+      ]
+    }
+  ],
+  "license": "public/licenses/cult-ui.txt"
+}

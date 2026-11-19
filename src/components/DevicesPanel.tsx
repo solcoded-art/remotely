@@ -1,6 +1,6 @@
 import type { Pin } from '@/lib/identity';
 import { ArrowRight, Laptop, Wifi } from 'lucide-react';
-import { Button } from '@/components/ui/button';
+import { PrimaryAction } from '@/components/PrimaryAction';
 import { Card } from '@/components/ui/card';
 import { MacSetup } from '@/components/MacSetup';
 import type { Device } from '@/lib/types';
@@ -9,7 +9,7 @@ export function DeviceCard({ device, ready, trusted, connect }: { device: Device
   return <li className="device-card">
     <span className="device-icon" aria-hidden="true"><Laptop size={28} strokeWidth={1.4} /></span>
     <div className="device-info"><h3 className="device-name">{device.name}</h3><p className="device-meta"><span className={`status-dot ${device.online ? 'online' : ''}`} aria-hidden="true" />{!ready ? 'Checking availability…' : !device.publicKey ? 'Update the Mac app to enable trusted pairing' : !trusted ? 'Pair this installation before connecting' : device.online ? 'Online · permission approval happens on your Mac' : 'Offline · open Mac Remote on this Mac'}</p></div>
-    <Button disabled={!ready || !device.online || !trusted || !device.publicKey} onClick={() => connect(device)} aria-label={`Connect to ${device.name}`}>Connect<ArrowRight size={16} aria-hidden="true" /></Button>
+    <PrimaryAction type="button" disabled={!ready || !device.online || !trusted || !device.publicKey} onClick={() => connect(device)} aria-label={`Connect to ${device.name}`}>Connect<ArrowRight size={16} aria-hidden="true" /></PrimaryAction>
   </li>;
 }
 

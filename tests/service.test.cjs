@@ -1,7 +1,7 @@
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const { once } = require('node:events');
-const { randomUUID, generateKeyPairSync, sign } = require('node:crypto');
+const { randomUUID, randomBytes, generateKeyPairSync, sign } = require('node:crypto');
 const keys = new Map();
 const trustPromise = import('../shared/trust.mjs');
 const signature = (device, text) => sign('sha256', Buffer.from(text), { key: device.privateKey, dsaEncoding: 'ieee-p1363' }).toString('base64url');
@@ -16,8 +16,10 @@ async function fixture(t, options = {}) {
   const name = `remote_test_${randomUUID().replaceAll('-', '')}`;
   await admin.query(`CREATE DATABASE ${name}`);
   const databaseURL = new URL(process.env.TEST_DATABASE_URL); databaseURL.pathname = '/' + name;
+  const mails = [];
+  const authOptions = { publicURL: 'http://127.0.0.1:3000', authSecret: randomBytes(48).toString('base64url'), sendMail: async mail => { mails.push(mail); }, ...options };
   let service;
-  try { service = await createService({ ...options, databaseURL: databaseURL.toString() }); }
+  try { service = await createService({ ...authOptions, databaseURL: databaseURL.toString() }); }
   catch (error) { await admin.query(`DROP DATABASE ${name}`); await admin.end(); throw error; }
   service.server.listen(0, '127.0.0.1'); await once(service.server, 'listening');
   const url = `http://127.0.0.1:${service.server.address().port}`;
@@ -26,7 +28,12 @@ async function fixture(t, options = {}) {
     const response = await fetch(url + route, { method: method || (data ? 'POST' : 'GET'), headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) }, ...(data ? { body: JSON.stringify(data) } : {}) });
     return { status: response.status, data: await response.json() };
   };
-  const account = async email => (await api('/api/auth/register', null, { email, password: 'long-password-for-tests' })).data;
+  const account = async email => {
+    const sent = await api('/api/auth/magic-link', null, { email }); assert.equal(sent.status, 200);
+    const mail = mails.findLast(item => item.email === email.toLowerCase());
+    const verified = await api('/api/auth/verify-link', null, { email, token: new URL(mail.url).hash.slice('#sign-in='.length) });
+    assert.equal(verified.status, 200); return verified.data;
+  };
   const device = async (token, kind) => {
     const trust = await trustPromise;
     const pair = generateKeyPairSync('ec', { namedCurve: 'prime256v1' });
@@ -91,7 +98,7 @@ async function fixture(t, options = {}) {
   };
   const restart = async () => {
     const port = service.server.address().port; await service.close();
-    service = await createService({ ...options, databaseURL: databaseURL.toString() });
+    service = await createService({ ...authOptions, databaseURL: databaseURL.toString() });
     service.server.listen(port, '127.0.0.1'); await once(service.server, 'listening');
   };
   return { api, account, device, socket, pair, restart, url };
@@ -108,11 +115,10 @@ test('login, device ownership, logout revocation, and legacy command removal', a
   assert.deepEqual((await api('/api/devices', second.token)).data.devices, []);
   assert.equal((await api('/api/devices')).status, 401);
   assert.equal((await api('/api/action', first.token, { action: 'shell', payload: { command: 'not-run' } })).status, 404);
-  assert.equal((await api('/api/auth/login', null, { email: 'owner@example.com', password: 'wrong-password-123' })).status, 401);
-  const login = await api('/api/auth/login', null, { email: 'OWNER@example.com', password: 'long-password-for-tests' });
-  assert.equal(login.status, 200);
-  assert.equal((await api('/api/auth/logout', login.data.token, {}, 'POST')).status, 200);
-  assert.equal((await api('/api/me', login.data.token)).status, 401);
+  assert.equal((await api('/api/auth/login', null, { email: 'owner@example.com', password: 'retired-password' })).status, 410);
+  const login = await account('OWNER@example.com');
+  assert.equal((await api('/api/auth/logout', login.token, {}, 'POST')).status, 200);
+  assert.equal((await api('/api/me', login.token)).status, 401);
   assert.equal((await api('/api/me', first.token)).status, 200);
 });
 
@@ -146,8 +152,8 @@ test('hostile origins are rejected and account deletion removes sessions and dev
   assert.equal(response.status, 403); assert.equal(response.headers.get('Access-Control-Allow-Origin'), null);
   const ws = new WebSocket(url.replace('http', 'ws') + '/ws', { origin: 'https://hostile.example' });
   const [error] = await once(ws, 'error'); assert.match(error.message, /403/);
-  assert.equal((await api('/api/account', owner.token, { password: 'incorrect-password' }, 'DELETE')).status, 403);
-  assert.equal((await api('/api/account', owner.token, { password: 'long-password-for-tests' }, 'DELETE')).status, 200);
+  assert.equal((await api('/api/account', owner.token, { confirmEmail: 'incorrect@example.com' }, 'DELETE')).status, 403);
+  assert.equal((await api('/api/account', owner.token, { confirmEmail: owner.user.email }, 'DELETE')).status, 200);
   assert.equal((await api('/api/me', owner.token)).status, 401);
   const replacement = await account('owner@example.com'); assert.deepEqual((await api('/api/devices', replacement.token)).data.devices, []);
 });
@@ -174,7 +180,7 @@ test('packaged clients remain allowed with a browser-only origin override', asyn
     const preflight = await fetch(url + '/api/auth/login', { method: 'OPTIONS', headers: { Origin: origin } });
     assert.equal(preflight.status, 204);
     assert.equal(preflight.headers.get('Access-Control-Allow-Origin'), origin);
-    const response = await fetch(url + '/api/auth/login', { method: 'POST', headers: { Origin: origin, 'Content-Type': 'application/json' }, body: '{}' });
+    const response = await fetch(url + '/api/auth/magic-link', { method: 'POST', headers: { Origin: origin, 'Content-Type': 'application/json' }, body: '{}' });
     assert.equal(response.status, 400);
     assert.equal(response.headers.get('Access-Control-Allow-Origin'), origin);
   }

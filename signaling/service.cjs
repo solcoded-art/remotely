@@ -4,7 +4,7 @@ const path = require('node:path');
 const { randomUUID, createHmac } = require('node:crypto');
 const { WebSocketServer } = require('ws');
 const { createStore } = require('./store.cjs');
-const { createAuthentication, normalizeEmail } = require('./authentication.cjs');
+const { createAuthentication, validateAuthenticationSettings, normalizeEmail } = require('./authentication.cjs');
 const { createDownloads } = require('./downloads.cjs');
 
 const defaults = ['capacitor://localhost', 'app://macremote', 'http://localhost', 'http://127.0.0.1:5173', 'http://localhost:5173', 'http://127.0.0.1:3000', 'http://localhost:3000'];
@@ -28,13 +28,14 @@ async function createService(options = {}) {
       publicOrigin = url.origin;
     } catch { throw Object.assign(new Error('Invalid public origin.'), { code: 'PUBLIC_URL_INVALID' }); }
   }
+  validateAuthenticationSettings({ secret: options.authSecret, sendMail: options.sendMail });
   const store = await createStore(options.databaseURL || process.env.DATABASE_URL);
   // Packaged clients are first-party origins, even with a browser-origin override.
   const origins = new Set(['app://macremote', 'capacitor://localhost', ...(options.origins || (process.env.ALLOWED_ORIGINS ? process.env.ALLOWED_ORIGINS.split(',').map(value => value.trim()).filter(Boolean) : defaults))]);
   if (publicOrigin) origins.add(publicOrigin);
   let authentication;
   try { authentication = await createAuthentication({ store, publicOrigin, origins, secret: options.authSecret,
-    sendMail: options.sendMail, enableMagicLinks: options.enableMagicLinks, allowRegistration: (options.allowRegistration ?? process.env.ALLOW_REGISTRATION) !== 'false' }); }
+    sendMail: options.sendMail, allowRegistration: (options.allowRegistration ?? process.env.ALLOW_REGISTRATION) !== 'false' }); }
   catch (error) { await store.close(); throw error; }
   // Browser module/CSS requests may carry Origin even on the app's own host.
   // Do not rely on a manually configured PUBLIC_URL for same-origin traffic.
@@ -50,7 +51,6 @@ async function createService(options = {}) {
   const peers = new Map();
   const sessions = new Map();
   const buckets = new Map();
-  let activeAuth = 0;
   let closing = false;
   function limited(key, limit, interval) {
     const now = Date.now();
@@ -129,20 +129,7 @@ async function createService(options = {}) {
           const stream = fs.createReadStream(file); stream.on('error', () => res.destroy()); stream.pipe(res); return;
         } catch { throw fail(404, 'Not found. Build the client with npm run build.'); }
       }
-      if (['/api/auth/register', '/api/auth/login'].includes(route) && req.method === 'POST') {
-        if (limited(`auth:${req.socket.remoteAddress}`, 25, 15 * 60 * 1000)) throw fail(429, 'Too many attempts. Try again in 15 minutes.');
-        const data = await readBody(req);
-        const email = normalizeEmail(data.email);
-        if (!text(data.password, 256) || data.password.length < 12) throw fail(400, 'Enter an email and a password of at least 12 characters.');
-        if (limited(`email:${email}`, 10, 15 * 60 * 1000)) throw fail(429, 'Too many attempts. Try again in 15 minutes.');
-        if (activeAuth >= 4) throw fail(503, 'Sign-in is busy. Try again shortly.');
-        activeAuth++;
-        try {
-          const register = route.endsWith('register');
-          if (register && (options.allowRegistration ?? process.env.ALLOW_REGISTRATION) === 'false') throw fail(403, 'Registration is disabled.');
-          return json(200, await authentication.password(email, data.password, register, data.remember === true, req, res));
-        } finally { activeAuth--; }
-      }
+      if (['/api/auth/register', '/api/auth/login'].includes(route)) throw fail(410, 'Password sign-in has been removed. Update the app and sign in with an email link.');
       if (route === '/api/auth/config' && req.method === 'GET') return json(200, { magicLink: authentication.magicAvailable });
       if (route === '/api/auth/session' && req.method === 'GET') return json(200, await authentication.restore(req, res));
       if (['/api/auth/magic-link', '/api/auth/verify-link'].includes(route) && req.method === 'POST') {
@@ -162,9 +149,7 @@ async function createService(options = {}) {
       if (route === '/api/account' && req.method === 'DELETE') {
         if (limited(`delete:${user.id}`, 5, 15 * 60 * 1000)) throw fail(429, 'Too many attempts. Try again later.');
         const data = await readBody(req);
-        if (await store.hasPassword(user.id)) {
-          if (!text(data.password, 256) || !(await store.login(user.email, data.password))) throw fail(403, 'Password is incorrect.');
-        } else if (data.confirmEmail !== user.email || !await store.freshSession(token)) throw fail(403, 'Sign in with a fresh email link, then enter your email to confirm deletion.');
+        if (data.confirmEmail !== user.email || !await store.freshSession(token)) throw fail(403, 'Sign in with a fresh email link, then enter your email to confirm deletion.');
         for (const peer of peers.values()) if (peer.user.id === user.id) peer.ws.close(4001, 'Account deleted');
         await store.deleteUser(user.id); return json(200, { status: 'ok' });
       }

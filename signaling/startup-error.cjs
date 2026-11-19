@@ -1,5 +1,6 @@
 // Use fixed messages: driver errors can include connection strings or passwords.
 const messages = {
+  SMTP_PORT_INVALID: 'SMTP_PORT must be a valid port number from the mail provider.',
   AUTH_SECRET_INVALID: 'BETTER_AUTH_SECRET must be a high-entropy secret of at least 32 characters.',
   SMTP_FROM_INVALID: 'SMTP_FROM_ADDRESS must be an address at SMTP_FROM_DOMAIN.',
   DATABASE_URL_MISSING: 'DATABASE_URL is missing. Copy .env.example to .env and start with npm start.',

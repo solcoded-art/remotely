@@ -1,7 +1,7 @@
 import type { PublicKey, Grant } from '../../shared/trust.mjs';
 import type { Pin } from './identity';
 export type User = { id: string; email: string };
-export type Auth = { user: User; token: string; expires: number; service: string; hasPassword?: boolean };
+export type Auth = { user: User; token: string; expires: number; service: string };
 export type Device = { id: string; name: string; kind: 'desktop' | 'controller'; online: boolean; publicKey: PublicKey | null };
 export type RunningApp = { pid: number; name: string; bundleId: string; active: boolean };
 export type DisplaySource = { id: string; displayId: string; name: string; thumbnail: string };

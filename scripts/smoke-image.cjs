@@ -63,9 +63,19 @@ async function main() {
       assert.deepEqual(errors, []);
       await page.screenshot({ path: 'artifacts/production-docs.png', fullPage: true });
     } finally { await browser.close(); }
-    phase = 'account registration';
-    const authResponse = await fetch(url + '/api/auth/register', { method: 'POST', headers: { 'Content-Type': 'application/json', Origin: url }, body: JSON.stringify({ email: 'image-test@example.com', password: 'image-smoke-password-123' }) });
-    assert.equal(authResponse.status, 200); const auth = await authResponse.json();
+    phase = 'password retirement';
+    for (const route of ['/api/auth/register', '/api/auth/login']) {
+      const retired = await fetch(url + route, { method: 'POST', headers: { 'Content-Type': 'application/json', Origin: url }, body: '{}' });
+      assert.equal(retired.status, 410);
+    }
+    // The production container has no SMTP test hook. Seed a verified session only in
+    // this disposable database; real magic-link issuance is covered by API/UI tests.
+    phase = 'verified session fixture';
+    const userId = randomUUID(); const token = randomUUID() + randomUUID();
+    docker(['exec', database, 'psql', '-U', 'postgres', '-d', 'remote_test', '-v', 'ON_ERROR_STOP=1', '-c',
+      `INSERT INTO remote_users (id,email,email_verified) VALUES ('${userId}','image-test@example.com',TRUE);
+       INSERT INTO remote_auth_sessions (id,token,user_id,expires_at) VALUES ('${randomUUID()}','${token}','${userId}',NOW()+INTERVAL '1 day');`]);
+    const auth = { token, user: { id: userId, email: 'image-test@example.com' } };
     const headers = { Authorization: `Bearer ${auth.token}`, 'Content-Type': 'application/json', Origin: url };
     const trust = await import('../shared/trust.mjs');
     const pair = generateKeyPairSync('ec', { namedCurve: 'prime256v1' });

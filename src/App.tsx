@@ -21,18 +21,18 @@ import { MacSetupHelp } from '@/components/MacSetup';
 import type { Auth } from '@/lib/types';
 
 function Settings({ auth, logout }: { auth: Auth; logout(): void }) {
-  const [password, setPassword] = useState(''); const [error, setError] = useState(''); const [busy, setBusy] = useState(false); const [confirmDelete, setConfirmDelete] = useState(false);
-  return <Dialog onOpenChange={() => { setPassword(''); setError(''); setConfirmDelete(false); }}><DialogTrigger asChild><Button variant="ghost" size="icon" aria-label="Account settings"><Settings2 size={17} /></Button></DialogTrigger>
+  const [confirmEmail, setConfirmEmail] = useState(''); const [error, setError] = useState(''); const [busy, setBusy] = useState(false); const [confirmDelete, setConfirmDelete] = useState(false);
+  return <Dialog onOpenChange={() => { setConfirmEmail(''); setError(''); setConfirmDelete(false); }}><DialogTrigger asChild><Button variant="ghost" size="icon" aria-label="Account settings"><Settings2 size={17} /></Button></DialogTrigger>
     <DialogContent><DialogHeader><DialogTitle>Account settings</DialogTitle><DialogDescription>Your account connects your iPhone and Mac.</DialogDescription></DialogHeader>
       <p className="break-all text-sm">{auth.user.email}</p><p className="break-all text-xs text-muted-foreground">{auth.service}</p>
-      <p className="text-xs leading-6 text-muted-foreground">Stay signed in for up to 30 days. Your password is never saved. Sign out before someone else uses this device.</p>
+      <p className="text-xs leading-6 text-muted-foreground">Stay signed in for up to 30 days. Sign out before someone else uses this device.</p>
       <DialogClose asChild><Button variant="outline" onClick={logout}><LogOut />Sign out</Button></DialogClose>
       <div className="border-t border-border pt-4">
         {!confirmDelete ? <Button variant="ghost" className="text-destructive" onClick={() => setConfirmDelete(true)}>Delete account…</Button> : <form onSubmit={async event => {
           event.preventDefault(); setBusy(true); setError('');
-          try { await request(auth.service, '/api/account', { token: auth.token, method: 'DELETE', data: auth.hasPassword === false ? { confirmEmail: password } : { password } }); logout(); }
+          try { await request(auth.service, '/api/account', { token: auth.token, method: 'DELETE', data: { confirmEmail } }); logout(); }
           catch (error) { setError(error instanceof Error ? error.message : 'Deletion failed.'); } finally { setBusy(false); }
-        }}><p className="mb-3 text-xs leading-6 text-muted-foreground">Permanently delete your account, login sessions, and paired devices. {auth.hasPassword === false ? 'Sign in with a fresh email link (within five minutes), then enter your email to confirm.' : 'Enter your password to confirm.'}</p><Input aria-label={auth.hasPassword === false ? 'Confirm account email' : 'Confirm account password'} type={auth.hasPassword === false ? 'email' : 'password'} autoComplete={auth.hasPassword === false ? 'email' : 'current-password'} required value={password} onChange={event => setPassword(event.target.value)} />{error && <p role="alert" className="mt-3 text-xs text-destructive">{error}</p>}<Button variant="destructive" className="mt-3 w-full" disabled={busy}>{busy && <Loader2 className="animate-spin" />}Permanently delete account</Button></form>}
+        }}><p className="mb-3 text-xs leading-6 text-muted-foreground">Permanently delete your account, login sessions, and paired devices. Sign in with a fresh email link (within five minutes), then enter your email to confirm.</p><Input aria-label="Confirm account email" type="email" autoComplete="email" required value={confirmEmail} onChange={event => setConfirmEmail(event.target.value)} />{error && <p role="alert" className="mt-3 text-xs text-destructive">{error}</p>}<Button variant="destructive" className="mt-3 w-full" disabled={busy}>{busy && <Loader2 className="animate-spin" />}Permanently delete account</Button></form>}
       </div>
     </DialogContent>
   </Dialog>;

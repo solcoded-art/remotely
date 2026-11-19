@@ -9,6 +9,8 @@ test('login and documentation reflow with enlarged text and expose keyboard navi
   await expect(page.getByLabel('Email address')).toBeVisible();
   await page.keyboard.press('Tab');
   await expect(page.getByRole('link', { name: 'Skip to main content' })).toBeFocused();
+  const skipBounds = await page.getByRole('link', { name: 'Skip to main content' }).boundingBox();
+  expect(skipBounds?.y).toBeGreaterThanOrEqual(0); expect(skipBounds?.height).toBeGreaterThanOrEqual(44);
   await page.keyboard.press('Enter');
   await expect(page.locator('main')).toBeFocused();
   await page.evaluate(() => document.fonts.ready);
@@ -118,4 +120,16 @@ test('email delivery unavailability never switches signup or sign-in to password
   expect(requests).toBe(0); await expectAccessible(page);
   ready = true; await page.getByRole('button', { name: 'Check availability', exact: true }).click();
   await expect(page.getByRole('button', { name: 'Send sign-in link', exact: true })).toBeEnabled(); expect(requests).toBe(0);
+});
+
+
+test('Cult controls keep keyboard targets usable with reduced motion', async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  await page.setViewportSize({ width: 390, height: 844 }); await page.goto('/');
+  await expect(page.getByRole('button', { name: 'Send sign-in link', exact: true })).toBeEnabled();
+  await page.getByLabel('Email address').focus(); await expect(page.getByLabel('Email address')).toBeFocused();
+  await page.getByRole('button', { name: 'Advanced connection settings', exact: true }).click();
+  await expect(page.getByLabel('Account server URL')).toBeVisible();
+  await expectAccessible(page);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1)).toBe(true);
 });

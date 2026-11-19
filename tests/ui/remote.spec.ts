@@ -38,6 +38,8 @@ test('real login and WebRTC connection with a synthetic desktop capture', async 
   await expectAccessible(desktop); await expectAccessible(phone);
   await desktop.getByRole('button', { name: 'Allow pairing', exact: true }).click();
   await expect(phone.getByRole('button', { name: 'Connect to Test Mac', exact: true })).toBeEnabled();
+  await phone.screenshot({ path: 'artifacts/cult-devices-390.png', fullPage: true });
+  await desktop.screenshot({ path: 'artifacts/cult-mac-setup-1280.png', fullPage: true });
   await phone.screenshot({ path: 'artifacts/trusted-phone.png', fullPage: true });
   await phone.getByRole('button', { name: 'Connect to Test Mac', exact: true }).click();
   await expect(phone.getByText('Approve on your Mac', { exact: true })).toBeVisible();

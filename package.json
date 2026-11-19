@@ -43,6 +43,7 @@
   "license": "ISC",
   "dependencies": {
     "@aparajita/capacitor-secure-storage": "8.0.1",
+    "@base-ui/react": "1.9.0",
     "@capacitor/core": "^8.0.0",
     "@capacitor/ios": "^8.0.0",
     "better-auth": "1.7.26",
@@ -51,6 +52,7 @@
     "cn": "^0.5.2",
     "disposable-email-domains-js": "2.2.0",
     "lucide-react": "^0.577.0",
+    "motion": "14.14.0",
     "nodemailer": "10.6.0",
     "pg": "^8.23.1",
     "qrcode": "^1.5.4",
