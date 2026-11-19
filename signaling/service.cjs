@@ -20,8 +20,18 @@ async function createService(options = {}) {
     } catch { throw Object.assign(new Error('Invalid public origin.'), { code: 'PUBLIC_URL_INVALID' }); }
   }
   const store = await createStore(options.databaseURL || process.env.DATABASE_URL);
-  const origins = new Set(options.origins || (process.env.ALLOWED_ORIGINS ? process.env.ALLOWED_ORIGINS.split(',').map(value => value.trim()).filter(Boolean) : defaults));
+  // Packaged clients are first-party origins, even with a browser-origin override.
+  const origins = new Set(['app://macremote', 'capacitor://localhost', ...(options.origins || (process.env.ALLOWED_ORIGINS ? process.env.ALLOWED_ORIGINS.split(',').map(value => value.trim()).filter(Boolean) : defaults))]);
   if (publicOrigin) origins.add(publicOrigin);
+  // Browser module/CSS requests may carry Origin even on the app's own host.
+  // Do not rely on a manually configured PUBLIC_URL for same-origin traffic.
+  function allowsOrigin(origin, req) {
+    if (!origin || origins.has(origin)) return true;
+    try {
+      const url = new URL(origin);
+      return ['http:', 'https:'].includes(url.protocol) && url.origin === origin && url.host === req.headers.host?.toLowerCase();
+    } catch { return false; }
+  }
   const publicDir = path.resolve(__dirname, '../dist');
   const peers = new Map();
   const sessions = new Map();
@@ -79,8 +89,10 @@ async function createService(options = {}) {
     res.setHeader('X-Content-Type-Options', 'nosniff');
     res.setHeader('Vary', 'Origin');
     const origin = req.headers.origin;
-    if (origin && !origins.has(origin)) return json(403, { error: 'Origin is not allowed.' });
-    if (origin) res.setHeader('Access-Control-Allow-Origin', origin);
+    const allowedOrigin = allowsOrigin(origin, req);
+    const publicFile = req.method === 'GET' && !req.url.startsWith('/api/') && req.url !== '/ws';
+    if (!allowedOrigin && !publicFile) return json(403, { error: 'Origin is not allowed.' });
+    if (origin && allowedOrigin) res.setHeader('Access-Control-Allow-Origin', origin);
     res.setHeader('Access-Control-Allow-Headers', 'Authorization, Content-Type');
     res.setHeader('Access-Control-Allow-Methods', 'GET, POST, DELETE, OPTIONS');
     if (req.method === 'OPTIONS') { res.writeHead(204); return res.end(); }
@@ -150,7 +162,7 @@ async function createService(options = {}) {
   const wss = new WebSocketServer({ noServer: true, maxPayload: 256 * 1024 });
   server.on('upgrade', (req, socket, head) => {
     const origin = req.headers.origin;
-    if (req.url !== '/ws' || (origin && !origins.has(origin)) || limited(`upgrade:${req.socket.remoteAddress}`, 60, 60000)) { socket.end('HTTP/1.1 403 Forbidden\r\nConnection: close\r\n\r\n'); return; }
+    if (req.url !== '/ws' || !allowsOrigin(origin, req) || limited(`upgrade:${req.socket.remoteAddress}`, 60, 60000)) { socket.end('HTTP/1.1 403 Forbidden\r\nConnection: close\r\n\r\n'); return; }
     wss.handleUpgrade(req, socket, head, ws => wss.emit('connection', ws));
   });
   wss.on('connection', ws => {

@@ -1,6 +1,8 @@
 const { execFileSync } = require('node:child_process');
 const { randomUUID } = require('node:crypto');
 const assert = require('node:assert/strict');
+const { chromium } = require('@playwright/test');
+const fs = require('node:fs');
 const id = randomUUID().slice(0, 8);
 const network = `remote-smoke-${id}`;
 const database = `${network}-db`;
@@ -40,15 +42,29 @@ async function main() {
     const html = await (await fetch(url)).text(); assert.match(html, /<div id="root">/);
     const asset = html.match(/src="([^"]+\.js)"/)[1]; assert.equal((await fetch(new URL(asset, url + '/'))).status, 200);
     assert.equal((await fetch(url + '/api/devices')).status, 401);
+    phase = 'production browser render';
+    const browser = await chromium.launch({ channel: 'chrome', headless: true });
+    try {
+      const page = await browser.newPage();
+      const errors = [];
+      page.on('pageerror', error => errors.push(error.message));
+      page.on('response', response => { if (response.url().includes('/assets/') && !response.ok()) errors.push('Asset failed: ' + response.status()); });
+      await page.goto(url, { waitUntil: 'networkidle' });
+      await page.getByRole('heading', { name: 'Welcome back' }).waitFor();
+      assert.equal(await page.locator('body').evaluate(body => getComputedStyle(body).backgroundColor), 'rgb(16, 17, 19)');
+      assert.deepEqual(errors, []);
+      fs.mkdirSync('artifacts', { recursive: true });
+      await page.screenshot({ path: 'artifacts/production-build.png', fullPage: true });
+    } finally { await browser.close(); }
     phase = 'account registration';
-    const authResponse = await fetch(url + '/api/auth/register', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email: 'image-test@example.com', password: 'image-smoke-password-123' }) });
+    const authResponse = await fetch(url + '/api/auth/register', { method: 'POST', headers: { 'Content-Type': 'application/json', Origin: url }, body: JSON.stringify({ email: 'image-test@example.com', password: 'image-smoke-password-123' }) });
     assert.equal(authResponse.status, 200); const auth = await authResponse.json();
-    const headers = { Authorization: `Bearer ${auth.token}`, 'Content-Type': 'application/json' };
+    const headers = { Authorization: `Bearer ${auth.token}`, 'Content-Type': 'application/json', Origin: url };
     assert.equal((await fetch(url + '/api/devices', { method: 'POST', headers, body: JSON.stringify({ id: randomUUID(), name: 'Image test Mac', kind: 'desktop' }) })).status, 200);
     phase = 'restart and persistence';
-    docker(['restart', service]); url = address(); await healthy();
+    docker(['restart', service]); url = address(); headers.Origin = url; await healthy();
     const list = await (await fetch(url + '/api/devices', { headers })).json(); assert.equal(list.devices.length, 1);
-    console.log('Container smoke passed: health, built UI/assets, authenticated API, migrations, and accounts/devices surviving restart.');
+    console.log('Container smoke passed: health, actual browser rendering of built UI/assets, same-origin API, migrations, and accounts/devices surviving restart.');
   } finally { cleanup(); }
 }
 main().catch(() => { console.error(`Container smoke failed during: ${phase}. No environment values have been logged.`); process.exitCode = 1; });

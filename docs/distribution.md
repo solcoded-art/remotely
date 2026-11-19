@@ -2,6 +2,8 @@
 
 ## Mac companion
 
+Normal use requires opening the installed Mac Remote app and signing in; the account backend runs on Ongale. Users do not start Node, Docker, or a local account server. The packaged interface defaults to the production account server; developers can override it with `VITE_ACCOUNT_SERVER` or the advanced login setting. The Mac app must remain open to share its screen and receive approved input.
+
 `npm run desktop:package` produces an Apple Silicon `.app` in `release/mac-arm64/`. `npm run desktop:dmg` produces a DMG. The Swift helper is compiled for the build machine's architecture; cross-architecture or universal builds are not configured.
 
 Development builds are unsigned. For external distribution, configure a Developer ID Application identity for electron-builder and notarization through its supported environment variables or Keychain configuration. Keep all signing material outside this repository. Sign the embedded helper consistently with the app, then test both Accessibility and Screen Recording permissions on a clean Mac. The app closes remote access when its window closes; background tray hosting is not implemented.

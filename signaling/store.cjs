@@ -16,7 +16,7 @@ async function createStore(connectionString) {
     if (!['postgres:', 'postgresql:'].includes(new URL(connectionString).protocol)) throw Error();
   } catch { throw Object.assign(new Error('Invalid database configuration.'), { code: 'DATABASE_URL_INVALID' }); }
   // Ongale supplies DATABASE_URL at runtime. Preserve its authentication and SSL settings.
-  const pool = new Pool({ connectionString, max: 5, connectionTimeoutMillis: 5000, idleTimeoutMillis: 10000, statement_timeout: 5000 });
+  const pool = new Pool({ connectionString, max: 5, connectionTimeoutMillis: 5000, idleTimeoutMillis: 10000 });
   pool.on('error', () => console.error('[Database] An idle connection failed; it will be replaced.'));
   try {
     const client = await pool.connect();

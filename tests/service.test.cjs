@@ -6,14 +6,14 @@ const { WebSocket } = require('ws');
 const { createService } = require('../signaling/service.cjs');
 const { Client } = require('pg');
 
-async function fixture(t) {
+async function fixture(t, options = {}) {
   assert.ok(process.env.TEST_DATABASE_URL, 'Use npm test to provision disposable PostgreSQL.');
   const admin = new Client({ connectionString: process.env.TEST_DATABASE_URL });
   await admin.connect();
   const name = `remote_test_${randomUUID().replaceAll('-', '')}`;
   await admin.query(`CREATE DATABASE ${name}`);
   const databaseURL = new URL(process.env.TEST_DATABASE_URL); databaseURL.pathname = '/' + name;
-  const service = await createService({ databaseURL: databaseURL.toString() });
+  const service = await createService({ ...options, databaseURL: databaseURL.toString() });
   service.server.listen(0, '127.0.0.1'); await once(service.server, 'listening');
   const url = `http://127.0.0.1:${service.server.address().port}`;
   t.after(async () => { await service.close(); await admin.query(`DROP DATABASE ${name}`); await admin.end(); });
@@ -25,8 +25,8 @@ async function fixture(t) {
   const device = async (token, kind, id = randomUUID()) => {
     const result = await api('/api/devices', token, { id, kind, name: kind }); assert.equal(result.status, 200); return result.data.device;
   };
-  const socket = async (token, deviceId) => {
-    const ws = new WebSocket(url.replace('http', 'ws') + '/ws');
+  const socket = async (token, deviceId, origin) => {
+    const ws = new WebSocket(url.replace('http', 'ws') + '/ws', origin ? { origin } : {});
     const queue = []; const waiters = [];
     ws.on('message', raw => {
       const message = JSON.parse(raw.toString());
@@ -94,4 +94,32 @@ test('hostile origins are rejected and account deletion removes sessions and dev
   assert.equal((await api('/api/account', owner.token, { password: 'long-password-for-tests' }, 'DELETE')).status, 200);
   assert.equal((await api('/api/me', owner.token)).status, 401);
   const replacement = await account('owner@example.com'); assert.deepEqual((await api('/api/devices', replacement.token)).data.devices, []);
+});
+
+
+test('unlisted same-origin browser clients can use the API and WebSocket', async t => {
+  const { account, device, socket, url } = await fixture(t);
+  const owner = await account('same-origin@example.com');
+  const phone = await device(owner.token, 'controller');
+  const preflight = await fetch(url + '/api/me', { method: 'OPTIONS', headers: { Origin: url } });
+  assert.equal(preflight.status, 204);
+  assert.equal(preflight.headers.get('Access-Control-Allow-Origin'), url);
+  const response = await fetch(url + '/api/me', { headers: { Origin: url, Authorization: `Bearer ${owner.token}` } });
+  assert.equal(response.status, 200);
+  assert.equal(response.headers.get('Access-Control-Allow-Origin'), url);
+  const peer = await socket(owner.token, phone.id, url);
+  assert.equal(peer.ws.readyState, WebSocket.OPEN);
+});
+
+
+test('packaged clients remain allowed with a browser-only origin override', async t => {
+  const { url } = await fixture(t, { origins: ['https://browser.example'] });
+  for (const origin of ['app://macremote', 'capacitor://localhost']) {
+    const preflight = await fetch(url + '/api/auth/login', { method: 'OPTIONS', headers: { Origin: origin } });
+    assert.equal(preflight.status, 204);
+    assert.equal(preflight.headers.get('Access-Control-Allow-Origin'), origin);
+    const response = await fetch(url + '/api/auth/login', { method: 'POST', headers: { Origin: origin, 'Content-Type': 'application/json' }, body: '{}' });
+    assert.equal(response.status, 400);
+    assert.equal(response.headers.get('Access-Control-Allow-Origin'), origin);
+  }
 });

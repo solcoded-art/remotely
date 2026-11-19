@@ -29,7 +29,7 @@ The hosted service never captures screens, executes input, or invokes shell comm
 
 The image builds without `DATABASE_URL`. At startup the service connects to PostgreSQL and applies `signaling/migrations/*.sql` in a transaction protected by an advisory lock. If startup fails, fixed diagnostic messages identify common configuration, connection, authentication, schema-permission, and port errors without printing driver error text. Database URLs and credentials are not logged. Health becomes available after successful startup and answers without authentication or a database query.
 
-Use Ongale's injected `DATABASE_URL` exactly as provided. Do not add a password, `sslmode=require`, or a separate SSL override. The code passes the connection string directly to `pg.Pool` with five connections and bounded timeouts. No local disk or SQLite state is used.
+Use Ongale's injected `DATABASE_URL` exactly as provided. Do not add a password, `sslmode=require`, or a separate SSL override. The code passes the connection string directly to `pg.Pool` with five connections and bounded connection/idle timeouts; it does not send database session settings at connection startup. No local disk or SQLite state is used.
 
 ## Environment variables
 
@@ -38,14 +38,14 @@ Use Ongale's injected `DATABASE_URL` exactly as provided. Do not add a password,
 | `DATABASE_URL` | Injected by binding PostgreSQL | Runtime |
 | `PORT` | Injected application port | Default 3000 |
 | `HOST` | Listen address | Default `0.0.0.0` |
-| `PUBLIC_URL` | Actual HTTPS app origin, including an attached custom domain; permits browser login from that origin | For the hosted browser client |
+| `PUBLIC_URL` | Actual HTTPS app origin, including an attached custom domain; adds an explicitly trusted browser origin when the proxy rewrites Host | Optional when Host is preserved |
 | `ALLOW_REGISTRATION` | Set to `false` after creating beta accounts if registration should close | Default true |
 | `ALLOWED_ORIGINS` | Optional comma-separated replacement for browser/native origin defaults | Optional |
 | `STUN_URL` | Your relay provider's STUN URL | Recommended across networks |
 | `TURN_URLS` | Comma-separated TURN/TURNS URLs | Recommended across networks |
 | `TURN_SECRET` | Coturn REST shared secret; mark **Secret** in Ongale | With TURN |
 
-If replacing `ALLOWED_ORIGINS`, retain `app://macremote` and `capacitor://localhost` for the packaged clients. `PUBLIC_URL` is additionally permitted. The service uses Authorization bearer tokens and authenticates WebSockets with their first message, not query-string tokens. Credentialed responses are `no-store`. `/assets/` contains content-hashed public build files and can be cached.
+The packaged client origins `app://macremote` and `capacitor://localhost` remain allowed even when `ALLOWED_ORIGINS` replaces the browser-origin defaults. `PUBLIC_URL` is additionally permitted. Same-origin HTTP and WebSocket requests are accepted when Origin matches the request Host. Public build files are served without requiring an origin allowlist entry; unknown cross-origin API requests remain blocked. The service uses Authorization bearer tokens and authenticates WebSockets with their first message, not query-string tokens. Credentialed responses are `no-store`. `/assets/` contains content-hashed public build files and can be cached.
 
 Never paste production secrets into chat or commit them in `.env`. Set TURN secrets on Ongale's app Variables page. `VITE_ACCOUNT_SERVER` is an optional **public build-time** default for native clients; otherwise the user enters the HTTPS account-server origin in the login form. Both devices must use that same origin. A native build does not need your database URL or relay secret.
 
@@ -69,3 +69,10 @@ Use the same idempotency key when retrying platform changes. Preserve the Ongale
 - Email/password accounts work, but email verification, password recovery, and MFA are not implemented. The installed `ongale-email` skill defines the platform's `SMTP_*` contract for that follow-up; no outgoing email has been configured or sent.
 - Native iPhone video playback, macOS Accessibility/Screen Recording grants, multi-monitor selection, NAT traversal, and mobile carrier networks still require physical-device validation.
 - This directory includes all eight official skills with a source/hash manifest. Storage, media, email, and repair skills are available for later use; copying them is not evidence that those services are enabled.
+
+
+## November 19 production blank screen
+
+The public deployment returned HTML successfully but returned `403 {"error":"Origin is not allowed."}` for its own JavaScript module and stylesheet when the browser sent Origin. Requesting the same JavaScript without Origin returned 200. The fix accepts same-origin requests for API/WebSocket routes and keeps public files independent of cross-origin authorization. The container smoke now loads the production bundle in Chrome, checks the login heading and styled background, and tests same-origin API requests. Cloudflare's blocked analytics beacon is unrelated and does not require weakening script CSP.
+
+The refreshed skills explain that Ongale uses transaction pooling and ignores startup `statement_timeout`. That option has been removed; query limits follow the platform plan. The existing migration transaction and `pg_advisory_xact_lock` already follow the updated guidance. WebSocket heartbeat is already 15 seconds, below the documented idle timeout.

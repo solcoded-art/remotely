@@ -2,11 +2,12 @@ import { test, expect, type Page } from '@playwright/test';
 
 async function login(page: Page, email: string, register = false) {
   await page.goto('/');
+  if (await page.getByLabel('Account server URL').isVisible()) await page.getByLabel('Account server URL').fill('http://127.0.0.1:3000');
   if (register) await page.getByRole('button', { name: 'Create an account', exact: true }).click();
   await page.getByLabel('Email address').fill(email);
   await page.getByLabel('Password', { exact: true }).fill('browser-test-password-123');
   await page.getByRole('button', { name: register ? 'Create account' : 'Sign in', exact: true }).click();
-  await expect(page.getByText('Account connected', { exact: true })).toBeVisible();
+  await expect(page.getByText('Signed in', { exact: true })).toBeVisible();
 }
 async function noOverflow(page: Page) {
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1)).toBe(true);
