@@ -25,3 +25,46 @@ test('native desktop shell boots with isolated renderer and authenticated API ac
     await page.screenshot({ path: 'artifacts/desktop-companion.png', fullPage: true });
   } finally { await app.close(); }
 });
+
+test('native capture policy accepts Electron origin serialization without capturing the physical screen', async () => {
+  test.skip(process.platform !== 'darwin', 'The native origin regression requires Electron on macOS.');
+  const fs = await import('node:fs/promises'); const os = await import('node:os');
+  const root = await fs.mkdtemp(path.join(os.tmpdir(), 'remotely-capture-test-'));
+  const main = path.join(root, 'main.cjs');
+  await fs.writeFile(main, `
+    const { app, protocol, BrowserWindow, session } = require('electron');
+    const { createDisplayCaptureHandler } = require(${JSON.stringify(path.resolve('desktop/display-capture.cjs'))});
+    protocol.registerSchemesAsPrivileged([{ scheme: 'app', privileges: { standard: true, secure: true, supportFetchAPI: true, corsEnabled: true } }]);
+    global.probe = { approved: false, enumerations: 0, events: [] };
+    app.whenReady().then(async () => {
+      protocol.handle('app', () => new Response('<button onclick="navigator.mediaDevices.getDisplayMedia({video:true,audio:false}).catch(e=>{document.body.dataset.attempt=String(Number(document.body.dataset.attempt||0)+1)})">Request capture</button>', {headers:{'Content-Type':'text/html'}}));
+      const window = new BrowserWindow({webPreferences:{sandbox:true,contextIsolation:true,nodeIntegration:false}});
+      session.defaultSession.setPermissionRequestHandler((wc, permission, callback) => callback(permission === 'display-capture'));
+      const handler = createDisplayCaptureHandler(
+        () => ({ sessionId: global.probe.approved ? 'approved-session' : null, sourceId: 'synthetic-screen', frame: window.webContents.mainFrame }),
+        async () => { global.probe.enumerations++; return [{id:'synthetic-screen',name:'Synthetic display'}]; }
+      );
+      session.defaultSession.setDisplayMediaRequestHandler((request, callback) => handler(request, streams => {
+        global.probe.events.push({ origin: request.securityOrigin, selected: streams.video?.id || null });
+        callback({}); // Always deny OS capture; no real screen is requested or shared.
+      }));
+      await window.loadURL('app://macremote/');
+    });
+    app.on('window-all-closed', () => app.quit());
+  `);
+  let app;
+  try {
+    app = await electron.launch({ args: [main], env: { ...process.env, ELECTRON_RUN_AS_NODE: undefined } as unknown as Record<string, string> });
+    const page = await app.firstWindow();
+    await page.getByRole('button', { name: 'Request capture' }).click();
+    await expect(page.locator('body')).toHaveAttribute('data-attempt', '1');
+    expect(await app.evaluate(() => (globalThis as any).probe.enumerations)).toBe(0);
+    await app.evaluate(() => { (globalThis as any).probe.approved = true; });
+    await page.getByRole('button', { name: 'Request capture' }).click();
+    await expect(page.locator('body')).toHaveAttribute('data-attempt', '2');
+    const events = await app.evaluate(() => (globalThis as any).probe.events) as { origin: string; selected: string | null }[];
+    expect(events.every(event => event.origin === 'app://macremote/')).toBe(true);
+    expect(events.filter(event => event.selected)).toEqual([{ origin: 'app://macremote/', selected: 'synthetic-screen' }]);
+    expect(await app.evaluate(() => (globalThis as any).probe.enumerations)).toBe(1);
+  } finally { await app?.close(); await fs.rm(root, { recursive: true, force: true }); }
+});

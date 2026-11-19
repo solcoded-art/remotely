@@ -25,6 +25,8 @@ jobs:
           test "$(uname -m)" = arm64
           node -e "const a=require('./release.config.json'),p=require('./package.json'); if(a.version!==p.version || process.env.GITHUB_REF_NAME!=='mac-v'+p.version) process.exit(1)"
       - run: npm ci
+      - name: Verify native capture authorization and origin handling
+        run: npm run test:capture
       - name: Build Apple Silicon app
         run: npm run desktop:package
       - name: Verify bundle seals and tamper rejection

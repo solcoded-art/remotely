@@ -259,6 +259,7 @@ export class Connection {
   approve = async () => {
     const pending = this.value.pending;
     if (!pending || !this.desktop) return;
+    let stage: 'setup' | 'capture' = 'setup';
     try {
       const pin = (await this.identity.pins())[pending.peerId];
       if (!pin || pin.grantId !== pending.grantId) throw Error('Device trust was revoked. Pair again before connecting.');
@@ -267,15 +268,22 @@ export class Connection {
       if (this.value.pending?.id !== pending.id || this.disposed) return;
       this.update({ pending: { ...pending, desktopNonce } });
       await window.macRemote!.approve(pending.id);
+      stage = 'capture';
       this.capture = await navigator.mediaDevices.getDisplayMedia({ video: { frameRate: { ideal: 30, max: 30 }, width: { ideal: 1920 }, height: { ideal: 1080 } }, audio: false });
       if (this.disposed || this.value.pending?.id !== pending.id || !this.value.ready) { this.cleanupPeer(); return; }
       for (const track of this.capture.getTracks()) track.addEventListener('ended', () => this.end(), { once: true });
       this.update({ stream: this.capture });
       this.send({ type: 'approve', sessionId: pending.id, allowed: true, desktopNonce, approvalSignature });
     } catch (error) {
-      this.report(error);
-      try { this.send({ type: 'approve', sessionId: pending.id, allowed: false }); } catch {}
+      if (this.value.pending?.id !== pending.id) return;
+      const name = error instanceof Error ? error.name : '';
+      const message = stage === 'setup' ? (error instanceof Error ? error.message : 'Mac setup could not be approved.')
+        : name === 'NotAllowedError' ? 'macOS blocked screen sharing. Enable Mac Remote in Privacy & Security → Screen & System Audio Recording (Screen Recording on older versions), quit and reopen Mac Remote, then choose your display again.'
+        : name === 'InvalidStateError' ? 'Screen sharing could not start from this approval. Retry Allow connection in the Mac app.'
+        : 'Screen capture failed. Check Screen Recording permission, quit and reopen Mac Remote, then choose your display again.';
+      try { this.send({ type: 'approve', sessionId: pending.id, allowed: false, failure: stage }); } catch {}
       this.cleanupPeer();
+      this.update({ pending: null, session: null, status: this.value.ready ? 'ready' : 'offline', error: message });
     }
   };
   decline = () => {

@@ -1,6 +1,6 @@
 import type { BrowserContext } from '@playwright/test';
 
-export async function installMacFixture(context: BrowserContext, overrides: { permissions?: { accessibility: boolean; screen: string }; driverReady?: boolean } = {}) {
+export async function installMacFixture(context: BrowserContext, overrides: { permissions?: { accessibility: boolean; screen: string }; driverReady?: boolean; captureError?: string } = {}) {
   await context.addInitScript((overrides) => {
     const fixture = { permissions: { accessibility: true, screen: 'granted' }, driverReady: true, ...overrides };
     (window as any).macTest = fixture;
@@ -30,6 +30,7 @@ export async function installMacFixture(context: BrowserContext, overrides: { pe
       onDriver: (listener: (value: unknown) => void) => { listeners.add(listener); return () => listeners.delete(listener); },
     };
     Object.defineProperty(navigator.mediaDevices, 'getDisplayMedia', { value: async () => {
+      if (fixture.captureError) throw new DOMException('Synthetic capture failure', fixture.captureError);
       const canvas = document.createElement('canvas'); canvas.width = 1280; canvas.height = 800;
       const ctx = canvas.getContext('2d')!;
       const paint = () => { ctx.fillStyle = '#1b2024'; ctx.fillRect(0, 0, 1280, 800); ctx.fillStyle = '#a5e2bd'; ctx.font = '28px monospace'; ctx.fillText('Synthetic desktop · WebRTC integration test', 50, 80); ctx.fillText(new Date().toISOString(), 50, 135); };

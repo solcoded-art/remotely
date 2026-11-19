@@ -290,7 +290,7 @@ async function createService(options = {}) {
         if (!session || ![session.desktop, session.controller].includes(identity.device.id)) throw fail(403, 'Session is unavailable.');
         if (data.type === 'approve') {
           if (session.desktop !== identity.device.id || session.approved) throw fail(403, 'Only the Mac can approve a pending request.');
-          if (data.allowed !== true) { finish(data.sessionId, 'Mac declined the connection'); return; }
+          if (data.allowed !== true) { finish(data.sessionId, data.failure === 'capture' ? 'Screen capture failed on the Mac. Check the Mac app for permission and display instructions.' : data.failure === 'setup' ? 'Mac setup failed. Check the Mac app for instructions.' : 'Mac declined the connection'); return; }
           if (!text(data.desktopNonce, 100) || trust.unb64(data.desktopNonce).length !== 32 || !await trust.verify(identity.device.publicKey, trust.sessionApproval(data.sessionId, identity.user.id, session.grantId, session.desktop, session.controller, session.controllerNonce, data.desktopNonce), data.approvalSignature)) throw fail(403, 'Mac session proof is required.');
           if (sessions.get(data.sessionId) !== session || revoking.has(session.grantId)) throw fail(403, 'Session is unavailable.');
           clearTimeout(session.timer); session.approved = true; session.desktopNonce = data.desktopNonce;

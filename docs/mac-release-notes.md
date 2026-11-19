@@ -1,6 +1,8 @@
 Apple Silicon developer beta. macOS 13 or newer. **No Apple Developer ID signature or notarization:** macOS may still block this app. No Intel build is included.
 
-Version 0.3.0 requires cryptographically paired installations. It adds protected device keys, one-use QR/link pairing with explicit Mac approval, signed session challenges and WebRTC negotiation, and revocation that ends an active session. Account-only 0.2.x clients are incompatible: update both clients and pair once. Device pairing is separate from account MFA, which is not implemented yet.
+Version 0.3.1 fixes screen capture being rejected after local approval: Electron serializes the bundled origin with a trailing slash. Capture still requires the approved session, selected screen and trusted main frame. Setup/capture errors now remain visible instead of being overwritten by “Mac declined the connection”.
+
+Version 0.3.0 introduced cryptographically paired installations. It adds protected device keys, one-use QR/link pairing with explicit Mac approval, signed session challenges and WebRTC negotiation, and revocation that ends an active session. Account-only 0.2.x clients are incompatible: update both clients and pair once. Device pairing is separate from account MFA, which is not implemented yet.
 
 1. Download and unzip the app, then move it to Applications. Update the phone website when the matching service is deployed.
 2. Sign in with the same account and server address on both devices. On the Mac, choose **Create pairing link**. Scan the QR using the phone Camera, or privately paste the full link on the phone, then choose **Allow pairing** on the Mac. The link expires in two minutes; pairing alone does not share the screen.

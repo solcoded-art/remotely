@@ -47,6 +47,14 @@ test('real login and WebRTC connection with a synthetic desktop capture', async 
   await expect(phone.getByText('Approve on your Mac', { exact: true })).toBeVisible();
   await expectAccessible(desktop);
   await expectAccessible(phone);
+  await desktop.evaluate(() => { (window as any).macTest.captureError = 'NotAllowedError'; });
+  await desktop.getByRole('button', { name: 'Allow connection', exact: true }).click();
+  await expect(desktop.getByRole('alert')).toContainText('macOS blocked screen sharing');
+  await expect(phone.getByRole('alert')).toContainText('Screen capture failed on the Mac');
+  await expect(desktop.getByRole('alert')).not.toContainText('Mac declined');
+  await expect(desktop.locator('video')).toHaveCount(0);
+  await desktop.evaluate(() => { delete (window as any).macTest.captureError; });
+  await phone.getByRole('button', { name: 'Connect to Test Mac', exact: true }).click();
   await desktop.getByRole('button', { name: 'Allow connection', exact: true }).click();
   await expect(phone.getByText('Session connected', { exact: true })).toBeVisible({ timeout: 20000 });
   await expect(phone.getByRole('button', { name: 'Visual Studio Code', exact: true })).toBeVisible();

@@ -1,3 +1,4 @@
+const { createDisplayCaptureHandler } = require('./display-capture.cjs');
 const { safeStorage } = require('electron');
 const { createIdentityStore } = require('./identity.cjs');
 const { app, BrowserWindow, ipcMain, protocol, net, session, desktopCapturer, systemPreferences } = require('electron');
@@ -66,15 +67,10 @@ app.whenReady().then(async () => {
   session.defaultSession.setPermissionRequestHandler((webContents, permission, callback) => {
     callback(webContents === window?.webContents && webContents.getURL().startsWith('app://macremote/') && approvedSession !== null && ['display-capture', 'media'].includes(permission));
   });
-  session.defaultSession.setDisplayMediaRequestHandler(async (request, callback) => {
-    try {
-      if (!approvedSession || !selectedSource || request.securityOrigin !== 'app://macremote') return callback({});
-      const sources = await desktopCapturer.getSources({ types: ['screen'], thumbnailSize: { width: 0, height: 0 } });
-      const source = sources.find(source => source.id === selectedSource.id);
-      if (!source) return callback({});
-      callback({ video: source });
-    } catch { callback({}); }
-  });
+  session.defaultSession.setDisplayMediaRequestHandler(createDisplayCaptureHandler(
+    () => ({ sessionId: approvedSession, sourceId: selectedSource?.id, frame: window?.webContents.mainFrame }),
+    () => desktopCapturer.getSources({ types: ['screen'], thumbnailSize: { width: 0, height: 0 } }),
+  ));
   const identities = createIdentityStore(path.join(app.getPath('userData'), 'device-keys'), safeStorage);
   handle('identity', scope => identities.identity(scope));
   handle('sign', (scope, message) => identities.sign(scope, message));

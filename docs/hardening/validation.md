@@ -49,3 +49,14 @@ Date: 2026-11-19. Evidence collected locally before commit, publication and depl
 Protocol, key-storage boundaries, account MFA/recovery gaps and coordinated release order are documented in [trusted devices](../trusted-devices.md). Native keys use encrypted software storage; the current phone website and iOS wrapper use non-extractable browser CryptoKeys, not Secure Enclave keys. Native capture/input, VoiceOver, carrier/TURN and clean-download Gatekeeper testing remain outside this evidence.
 
 For packaged authentication testing after building, set `MAC_APP_EXECUTABLE` to the app's `Contents/MacOS/Mac Remote` executable and invoke the existing PostgreSQL test runner with Playwright's `tests/ui/desktop.spec.ts`. This uses disposable accounts/databases and never requires production credentials.
+
+
+## Capture approval regression / 0.3.1
+
+The native Electron probe reproduced `request.securityOrigin` as `app://macremote/`; the 0.3.0 handler compared it to `app://macremote` and rejected it. The generic approval catch then sent an explicit decline and the service response replaced the original capture error.
+
+The fix accepts only the two exact serializations of the bundled origin, requires the current main frame and selected display, and rechecks approval after asynchronous display enumeration. Camera/microphone or foreign-frame capture is not enabled. Failed setup and failed capture now have separate bounded service messages; the Mac retains the actionable local failure.
+
+Validation: TypeScript/Vite build and 19 backend/security tests passed. A real Electron regression test exercises the production handler with Electron’s actual origin/frame objects and a synthetic source, then always denies the OS capture callback. It does not capture the physical screen or establish real-device capture/input success. The browser journey injects a screen permission failure, verifies the error survives service acknowledgment, and retries successfully with synthetic capture.
+
+The final UI suite passed all 12 tests. `npm run test:capture` runs the actual Electron origin/frame regression without a database or physical capture and is now a required Mac-release workflow step, so mocked browser capture cannot be the only coverage for this boundary. Local Mac package, strict tamper rejection, and production Docker smoke also passed.
