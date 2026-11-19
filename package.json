@@ -19,7 +19,7 @@
     "desktop:dmg": "npm run build && npm run build:driver && electron-builder --mac dmg",
     "ios:sync": "npm run build && cap sync ios",
     "ios:open": "cap open ios",
-    "test": "node scripts/test-with-postgres.cjs node --test tests/commands.test.cjs tests/display-capture.test.cjs tests/trust.test.cjs tests/service.test.cjs tests/startup.test.cjs tests/downloads.test.cjs",
+    "test": "node scripts/test-with-postgres.cjs node --test tests/commands.test.cjs tests/keyboard-queue.test.cjs tests/display-capture.test.cjs tests/trust.test.cjs tests/service.test.cjs tests/startup.test.cjs tests/downloads.test.cjs",
     "test:ui": "node scripts/test-with-postgres.cjs node node_modules/@playwright/test/cli.js test",
     "db:dev": "docker compose up -d --wait --wait-timeout 60 postgres",
     "icons:ios": "swift -module-cache-path /private/tmp/ios-remote-swift-module-cache scripts/build-ios-icon.swift",

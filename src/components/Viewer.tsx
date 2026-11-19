@@ -3,7 +3,7 @@ import { Monitor } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import type { Connection } from '@/lib/connection';
 
-export function Viewer({ connection, stream, connected, desktop, onReadyChange }: { connection: Connection; stream: MediaStream | null; connected: boolean; desktop: boolean; onReadyChange?(ready: boolean): void }) {
+export function Viewer({ connection, stream, connected, desktop, onReadyChange, interactive = true }: { connection: Connection; stream: MediaStream | null; connected: boolean; desktop: boolean; interactive?: boolean; onReadyChange?(ready: boolean): void }) {
   const ref = useRef<HTMLVideoElement>(null);
   const [playing, setPlaying] = useState(false);
   const helpId = useId();
@@ -15,7 +15,7 @@ export function Viewer({ connection, stream, connected, desktop, onReadyChange }
   function updatePlaying(value: boolean) { setPlaying(value); onReadyChange?.(value); }
   return <figure className="viewer" aria-label={desktop ? 'Shared display preview' : 'Live Mac display'} aria-describedby={helpId}>
     <video ref={ref} muted autoPlay playsInline aria-label={desktop ? 'Shared display preview' : 'Live Mac display'} onPlaying={() => updatePlaying(true)} onWaiting={() => updatePlaying(false)} onPause={() => updatePlaying(false)} onError={() => { updatePlaying(false); connection.report(Error('The display video could not play. Disconnect and try again.')); }} onClick={event => {
-      if (desktop || !connected || !playing) return;
+      if (desktop || !connected || !playing || !interactive) return;
       const video = event.currentTarget; if (!video.videoWidth || !video.videoHeight) return;
       const rect = video.getBoundingClientRect(); const scale = Math.min(rect.width / video.videoWidth, rect.height / video.videoHeight);
       const width = video.videoWidth * scale; const height = video.videoHeight * scale;

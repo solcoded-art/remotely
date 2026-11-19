@@ -60,3 +60,16 @@ The fix accepts only the two exact serializations of the bundled origin, require
 Validation: TypeScript/Vite build and 19 backend/security tests passed. A real Electron regression test exercises the production handler with Electron’s actual origin/frame objects and a synthetic source, then always denies the OS capture callback. It does not capture the physical screen or establish real-device capture/input success. The browser journey injects a screen permission failure, verifies the error survives service acknowledgment, and retries successfully with synthetic capture.
 
 The final UI suite passed all 12 tests. `npm run test:capture` runs the actual Electron origin/frame regression without a database or physical capture and is now a required Mac-release workflow step, so mocked browser capture cannot be the only coverage for this boundary. Local Mac package, strict tamper rejection, and production Docker smoke also passed.
+
+
+## Keyboard and screen controls
+
+Date: 2026-11-19. These web UI changes use the existing 0.3.1 Mac command protocol; no Mac installer update is required. Deployment status is verified separately from local results.
+
+- `npm test`: 22 passed against disposable PostgreSQL. New keyboard queue tests cover command order, burst limits, cancellation/failure without replay, bounded pending input and multiline Unicode preservation.
+- `npm run test:ui`: all 12 passed. The two-peer journey checks shortcut payloads, multiline drafts across control tabs, live input once per buffer, IME composition buffering, mobile deletion events, cancellation when video pauses, sticky screen geometry, fullscreen and expanded fallback, focus restoration, selected axe rules and responsive layouts including 320 pixels.
+- `npm run build`: TypeScript and both Vite entry points passed. The production Docker image smoke also passed actual built-page rendering, health, same-origin API, migrations and account/device persistence after restart.
+- `npm run ios:sync`: TypeScript/Vite build and Capacitor asset/plugin sync passed. This is not iOS compilation, signing, installation or TestFlight validation.
+- Browser captures and driver commands remain synthetic/mocked. Physical iPhone keyboard/IME, actual native text insertion and OS/browser fullscreen behavior still require manual device validation. Automated accessibility checks do not establish complete WCAG or ADA compliance.
+
+Live typing is opt-in. Pending browser input is bounded and discarded when video/control access stops; commands already accepted by the Mac cannot be recalled. The screen and app-switch controls wait for queued browser keyboard input to drain. Phone-view fullscreen and the active Mac app's fullscreen shortcut are separate controls.

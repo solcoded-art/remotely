@@ -1,20 +1,29 @@
-import { useState } from 'react';
-import { ShieldCheck } from 'lucide-react';
-import { Button } from '@/components/ui/button';
+import { useEffect, useRef, useState } from 'react';
 import { ConnectionProgress } from '@/components/ConnectionProgress';
 import { RemoteControls } from '@/components/RemoteControls';
-import { Viewer } from '@/components/Viewer';
+import { RemoteScreen } from '@/components/RemoteScreen';
 import type { Connection, ConnectionSnapshot } from '@/lib/connection';
 
 export function RemoteSession({ connection, state }: { connection: Connection; state: ConnectionSnapshot }) {
-  const [videoReady, setVideoReady] = useState(false);
+  const [videoReady, setVideoReady] = useState(false); const [inputBusy, setInputBusy] = useState(false);
+  const root = useRef<HTMLDivElement>(null);
   const connected = state.status === 'connected';
-  return <>
+  useEffect(() => {
+    const viewport = window.visualViewport;
+    const update = () => {
+      const height = viewport?.height || window.innerHeight;
+      root.current?.style.setProperty('--remote-visible-height', `${height}px`);
+      root.current?.toggleAttribute('data-compact-viewport', height < 480);
+      root.current?.style.setProperty('--remote-viewport-top', `${viewport?.offsetTop || 0}px`);
+    };
+    update(); viewport?.addEventListener('resize', update); viewport?.addEventListener('scroll', update); window.addEventListener('resize', update);
+    return () => { viewport?.removeEventListener('resize', update); viewport?.removeEventListener('scroll', update); window.removeEventListener('resize', update); };
+  }, []);
+  return <div ref={root} className="remote-workspace">
     <ConnectionProgress status={state.status} videoReady={videoReady} />
-    <div className="session-layout"><div className="min-w-0">
-      <Viewer connection={connection} stream={state.stream} connected={connected} desktop={false} onReadyChange={setVideoReady} />
-      <div className="viewer-status"><span className="flex items-center gap-2"><ShieldCheck size={15} aria-hidden="true" />{state.route || 'Encrypted peer connection'}</span>{state.latency !== null && <span>{state.latency} ms round trip</span>}</div>
-      <div className="session-actions"><p>{connected && videoReady ? 'Tap the screen to click, or use Mouse controls.' : 'Your controls unlock when the screen is playing.'}</p><Button variant="outline" onClick={connection.end}>{connected ? 'Disconnect' : 'Cancel'}</Button></div>
-    </div><RemoteControls connection={connection} connected={connected && videoReady} apps={state.apps} /></div>
-  </>;
+    <div className="session-layout">
+      <RemoteScreen connection={connection} state={state} inputBusy={inputBusy} onReadyChange={setVideoReady} />
+      <RemoteControls connection={connection} connected={connected && videoReady} apps={state.apps} inputBusy={inputBusy} onInputBusyChange={setInputBusy} />
+    </div>
+  </div>;
 }
