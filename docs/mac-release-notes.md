@@ -1,10 +1,11 @@
-Apple Silicon developer beta. macOS 13 or newer. **Unsigned and not notarized:** macOS may block this app from opening. This is not yet a signed consumer release; no Intel build is included.
+Apple Silicon developer beta. macOS 13 or newer. **No Apple Developer ID signature or notarization:** macOS may still block this app. No Intel build is included.
 
-1. Download and unzip the Mac app, then move it to Applications and open it.
-2. Sign in with the same account you use on your phone. The app defaults to the hosted Mac Remote account server.
-3. Choose a display and grant Screen Recording and Accessibility permissions.
-4. Keep Mac Remote open. On your phone, choose the Mac under My devices, tap Connect, and approve on the Mac.
+Version 0.2.3 replaces 0.2.2, which had an invalid bundle resource signature. Development binaries are now sealed inside-out using ad-hoc signatures, while preserving existing entitlements and runtime flags. Strict bundle/helper verification, tamper rejection, and packaged-app smoke checks run before and after ZIP extraction. Integrity signatures do not establish a trusted developer identity or Apple notarization.
 
-You do not run Node, Docker, npm, or a local server to use this download. The hosted backend runs on Ongale.
+1. Remove the old 0.2.2 app, download and unzip the new app, then move it to Applications.
+2. Sign in with the same account as your phone. Choose a display and grant Screen Recording and Accessibility permissions.
+3. Keep Mac Remote open, connect from your phone, and approve the request on the Mac.
 
-SHA256SUMS contains the SHA-256 checksum of the installer ZIP. Real device permissions, screen capture, and input require manual validation on the target Mac; automated peer tests use synthetic capture.
+If macOS reports a damaged app, stop and report the warning. Do not disable Gatekeeper or remove quarantine attributes. For an unverified-developer warning, consult [Apple’s guidance](https://support.apple.com/en-us/102445); an app-specific exception may be available after verifying the source.
+
+You do not run Node, Docker, npm, or a local server. SHA256SUMS contains the ZIP checksum. Actual OS permission grants, native input, and a clean Mac’s browser-download Gatekeeper experience still require manual validation; a local launch test does not establish those results.

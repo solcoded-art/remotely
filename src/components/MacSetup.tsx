@@ -43,7 +43,7 @@ export function MacSetupInstructions({ compact = false }: { compact?: boolean })
       {!available && !checking && <div className="mt-2 flex items-center justify-between gap-3"><p className="text-xs leading-5 text-muted-foreground">The installer is being prepared or its host is unavailable.</p><Button size="sm" variant="ghost" onClick={() => check()}><RefreshCw size={13} />Retry</Button></div>}
     </div>}
     <p className="mt-2 text-sm leading-5 text-muted-foreground">v{release.version} · Apple Silicon (M1 or newer) · macOS {release.minimumMacOS}+</p>
-    <p className="mt-2 text-sm leading-5 text-amber-200/80">Developer beta: this build is unsigned and isn’t notarized. macOS may block it from opening. A signed installer and an Intel build aren’t available yet.</p>
+    <p className="mt-2 text-sm leading-5 text-amber-200/80">Developer beta: no Apple Developer ID signature or notarization. macOS may block opening. A verified consumer installer and an Intel build aren’t available yet.</p>
     <ol className="mac-setup-steps">
       <li><span>1</span><div><strong>Download and open the Mac app</strong><p>Unzip the download, move Mac Remote to Applications, and open it.</p></div></li>
       <li><span>2</span><div><strong>Sign in and choose a display</strong><p>Use the same account as your phone. Allow Screen Recording and Accessibility when macOS asks.</p></div></li>

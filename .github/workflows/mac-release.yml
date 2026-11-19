@@ -27,12 +27,22 @@ jobs:
       - run: npm ci
       - name: Build Apple Silicon app
         run: npm run desktop:package
+      - name: Verify bundle seals and tamper rejection
+        run: node scripts/verify-mac.cjs 'release/mac-arm64/Mac Remote.app' --tamper-check
+      - name: Smoke test the packaged app
+        run: npm run desktop:smoke
       - name: Package installer and checksum
         run: |
           VERSION=$(node -p "require('./package.json').version")
           ditto -c -k --sequesterRsrc --keepParent 'release/mac-arm64/Mac Remote.app' "release/MacRemote-${VERSION}-mac-arm64.zip"
           cd release
           shasum -a 256 "MacRemote-${VERSION}-mac-arm64.zip" > SHA256SUMS
+      - name: Verify the extracted release archive
+        run: |
+          VERSION=$(node -p "require('./package.json').version")
+          ditto -x -k "release/MacRemote-${VERSION}-mac-arm64.zip" "$RUNNER_TEMP/mac-archive-check"
+          node scripts/verify-mac.cjs "$RUNNER_TEMP/mac-archive-check/Mac Remote.app"
+          node scripts/smoke-mac.cjs "$RUNNER_TEMP/mac-archive-check/Mac Remote.app"
       - name: Publish developer beta
         env:
           GH_TOKEN: ${{ github.token }}

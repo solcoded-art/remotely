@@ -1,7 +1,7 @@
 {
   "name": "ios-remote",
   "productName": "Mac Remote",
-  "version": "0.2.2",
+  "version": "0.2.3",
   "private": true,
   "description": "An account-paired iOS remote and Mac companion using WebRTC",
   "main": "desktop/main.cjs",
@@ -15,7 +15,7 @@
     "preview": "vite preview --host 127.0.0.1",
     "build:driver": "node scripts/build-driver.cjs",
     "desktop": "npm run build && npm run build:driver && electron .",
-    "desktop:package": "npm run build && npm run build:driver && electron-builder --mac dir",
+    "desktop:package": "npm run build && npm run build:driver && electron-builder --mac dir && npm run desktop:seal && npm run desktop:verify",
     "desktop:dmg": "npm run build && npm run build:driver && electron-builder --mac dmg",
     "ios:sync": "npm run build && cap sync ios",
     "ios:open": "cap open ios",
@@ -26,7 +26,10 @@
     "test:image": "docker build -t ios-remote-ongale:local . && node scripts/smoke-image.cjs",
     "fonts:prepare": "node scripts/prepare-fonts.cjs",
     "prebuild": "npm run fonts:prepare",
-    "predev": "npm run fonts:prepare"
+    "predev": "npm run fonts:prepare",
+    "desktop:seal": "node scripts/seal-mac.cjs",
+    "desktop:verify": "node scripts/verify-mac.cjs",
+    "desktop:smoke": "node scripts/smoke-mac.cjs"
   },
   "keywords": [
     "mac-remote",
