@@ -3,6 +3,9 @@ import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'reac
 import { Globe2, Loader2, LogOut, Settings2, ShieldCheck, Smartphone } from 'lucide-react';
 import { AppShell } from '@/components/AppShell';
 import { Login } from '@/components/Login';
+import { Landing } from '@/components/Landing';
+import { UpdateBanner } from '@/components/UpdateBanner';
+import { isWebClient, publicRoute } from '@/lib/routes';
 import { DesktopSetup } from '@/components/DesktopSetup';
 import { DevicesPanel } from '@/components/DevicesPanel';
 import { RemoteSession } from '@/components/RemoteSession';
@@ -83,6 +86,11 @@ function Workspace({ auth, logout, accountError = '' }: { auth: Auth; logout(): 
 
 const initialSignInToken = takeSignInToken();
 export default function App() {
+  // The update prompt only exists in the Mac app; it overlays every screen.
+  return <><AppContent />{window.macRemote && <UpdateBanner />}</>;
+}
+
+function AppContent() {
   const [linkToken, setLinkToken] = useState(initialSignInToken);
   const [auth, setAuth] = useState<Auth | null>(null); const [restoring, setRestoring] = useState(!initialSignInToken);
   const [accountError, setAccountError] = useState('');
@@ -99,9 +107,20 @@ export default function App() {
     try {
       try { await request(auth.service, '/api/auth/logout', { token: auth.token, method: 'POST' }); }
       catch (error) { if (!(error instanceof Error && 'status' in error && error.status === 401)) throw error; }
-      await clearSession(auth.service); setAuth(null); setAccountError('');
+      await clearSession(auth.service);
+      // After signing out on the web, land on the sign-in page rather than the marketing page.
+      if (isWebClient()) history.replaceState(null, '', '/login');
+      setAuth(null); setAccountError('');
     } catch { setAccountError('Sign-out could not finish. Check your connection and try again.'); }
   }
+  const route = publicRoute();
+  // Web visitors at `/` get the landing page straight away (even while a stored
+  // session is being checked); sign-in links and native apps go to sign-in.
+  if (!auth && route === 'home' && !linkToken) return <Landing />;
   if (restoring) return <AppShell><main id="main-content" className="page" tabIndex={-1}><p role="status" className="flex items-center gap-2"><Loader2 className="animate-spin" aria-hidden="true" />Restoring your sign-in…</p></main></AppShell>;
-  return auth ? <Workspace auth={auth} logout={logout} accountError={accountError} /> : <Login initialToken={linkToken} restoreError={accountError} onLogin={value => { setLinkToken(''); setAccountError(''); setAuth(value); }} />;
+  return auth ? <Workspace auth={auth} logout={logout} accountError={accountError} /> : <Login key={route} mode={route === 'sign-up' ? 'sign-up' : 'sign-in'} initialToken={linkToken} restoreError={accountError} onLogin={value => {
+    setLinkToken(''); setAccountError('');
+    if (isWebClient() && route !== 'home') history.replaceState(null, '', '/');
+    setAuth(value);
+  }} />;
 }

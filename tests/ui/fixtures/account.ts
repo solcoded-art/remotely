@@ -9,7 +9,7 @@ async function mailbox(email: string): Promise<{ id: string; url: string } | nul
   catch (error) { if ((error as NodeJS.ErrnoException).code === 'ENOENT') return null; throw error; }
 }
 export async function login(page: Page, email: string, options: { navigate?: boolean } = {}) {
-  if (options.navigate !== false) await page.goto('/');
+  if (options.navigate !== false) await page.goto('/login');
   await page.getByRole('button', { name: 'Advanced connection settings' }).click();
   await page.getByLabel('Account server URL').fill('http://127.0.0.1:3000');
   await page.getByLabel('Email address').fill(email);

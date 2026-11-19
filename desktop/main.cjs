@@ -2,7 +2,8 @@ const { createDisplayCaptureHandler } = require('./display-capture.cjs');
 const { safeStorage } = require('electron');
 const { createAuthSessionStore } = require('./auth-session.cjs');
 const { createIdentityStore } = require('./identity.cjs');
-const { app, BrowserWindow, ipcMain, protocol, net, session, desktopCapturer, systemPreferences } = require('electron');
+const { app, BrowserWindow, ipcMain, protocol, net, session, desktopCapturer, systemPreferences, shell, Notification } = require('electron');
+const { downloadPageURL, parseVersion } = require('./updates.cjs');
 const { spawn } = require('node:child_process');
 const fs = require('node:fs');
 const path = require('node:path');
@@ -79,7 +80,21 @@ app.whenReady().then(async () => {
   handle('sign', (scope, message) => identities.sign(scope, message));
   handle('pins', scope => identities.pins(scope));
   handle('pin', (scope, id, pin) => identities.pin(scope, id, pin));
-  handle('info', () => ({ name: os.hostname(), driverReady }));
+  handle('info', () => ({ name: os.hostname(), driverReady, version: app.getVersion() }));
+  // Update prompts: open only the account service's fixed download page, and
+  // show at most one native notification per newer version.
+  handle('open-update', async service => { await shell.openExternal(downloadPageURL(service)); });
+  const notifiedVersions = new Set();
+  handle('notify-update', (service, version) => {
+    const url = downloadPageURL(service);
+    if (!parseVersion(version)) throw Error('Invalid version.');
+    if (notifiedVersions.has(version) || !Notification.isSupported()) return false;
+    notifiedVersions.add(version);
+    const notice = new Notification({ title: 'Remotely update available', body: `Version ${version} is ready to download.` });
+    notice.on('click', () => { void shell.openExternal(url); });
+    notice.show();
+    return true;
+  });
   handle('sources', async () => {
     const sources = await desktopCapturer.getSources({ types: ['screen'], thumbnailSize: { width: 360, height: 225 } });
     return sources.map(source => ({ id: source.id, name: source.name, displayId: source.display_id, thumbnail: source.thumbnail.toDataURL() }));
@@ -106,7 +121,7 @@ app.whenReady().then(async () => {
   });
   handle('permissions', prompt => ({ accessibility: systemPreferences.isTrustedAccessibilityClient(prompt === true), screen: systemPreferences.getMediaAccessStatus('screen') }));
 
-  window = new BrowserWindow({ width: 1180, height: 820, minWidth: 620, minHeight: 580, backgroundColor: '#101113', title: 'Mac Remote', webPreferences: { preload: path.join(__dirname, 'preload.cjs'), nodeIntegration: false, contextIsolation: true, sandbox: true } });
+  window = new BrowserWindow({ width: 1180, height: 820, minWidth: 620, minHeight: 580, backgroundColor: '#0a0a0c', title: 'Mac Remote', webPreferences: { preload: path.join(__dirname, 'preload.cjs'), nodeIntegration: false, contextIsolation: true, sandbox: true } });
   window.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
   window.webContents.on('will-navigate', event => event.preventDefault());
   window.webContents.on('render-process-gone', release);

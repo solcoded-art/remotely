@@ -4,6 +4,6 @@ const config: CapacitorConfig = {
   appId: 'com.macremote.ios',
   appName: 'Mac Remote',
   webDir: 'dist',
-  ios: { contentInset: 'never', preferredContentMode: 'mobile', backgroundColor: '#101113' },
+  ios: { contentInset: 'never', preferredContentMode: 'mobile', backgroundColor: '#0a0a0c' },
 };
 export default config;

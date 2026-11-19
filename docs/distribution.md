@@ -37,6 +37,14 @@ The independent `.github/workflows/mac-release.yml` runs only for a pushed `mac-
 
 Runner architecture reference: https://docs.github.com/en/actions/reference/runners/github-hosted-runners
 
+## In-app update prompts (Mac companion)
+
+The Mac app checks `/api/downloads/mac` on launch, every six hours, and when its window regains focus after 30 minutes. When the published `version` is newer than the running build and the download is `available`, it shows an **Update available** banner and one native macOS notification per version. **Download update** asks the main process to open `<account server>/download/mac`; the renderer cannot open any other URL (`desktop/updates.cjs`). **Later** hides that version until a newer one is published.
+
+To ship an update, bump `version` and `url` in `release.config.json` and deploy the service; installed apps pick it up on their next check. Optionally set `"minimumSupportedVersion": "x.y.z"` to show older apps a blocking **Update required** dialog instead, for example after a protocol or security change. Leave it unset for ordinary releases.
+
+This prompts users to download; it does not install updates. Silent download-and-relaunch updates (for example `electron-updater` with GitHub Releases) require a Developer ID–signed, notarized app, because macOS rejects updates for ad-hoc signed builds.
+
 ## Bundle signature regression and v0.2.3
 
 Skipping electron-builder signing left linker-only ad-hoc signatures with no resource seals on Electron bundles. The published v0.2.2 failed `codesign --verify --deep --strict` with `code has no resources but signature indicates they must be present`. A successful local launch did not exercise the downloaded-app security boundary.

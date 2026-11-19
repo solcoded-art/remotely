@@ -16,7 +16,3 @@ ios/DerivedData/
 *.xcuserstate
 xcuserdata/
 .DS_Store
-
-# Fontshare permits app embedding; do not redistribute the font through Git.
-src/assets/fonts/*.woff2
-src/assets/fonts/*.tmp

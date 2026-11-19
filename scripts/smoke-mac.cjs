@@ -15,7 +15,7 @@ async function main() {
     assert.equal(preferences.nodeIntegration, false);
     assert.equal(preferences.sandbox, true);
     await page.evaluate(() => document.fonts.ready);
-    assert.equal(await page.evaluate(() => [...document.fonts].some(font => font.family === 'Satoshi' && font.status === 'loaded')), true);
+    assert.equal(await page.evaluate(() => [...document.fonts].some(font => font.family === 'Geist Variable' && font.status === 'loaded')), true);
     await page.getByRole('button', { name: 'Advanced connection settings' }).click();
     assert.equal(await page.getByLabel('Account server URL').inputValue(), 'https://remotely-marisol-workspace-k1zb.ongale.dev');
     const denied = await page.evaluate(async () => { try { await window.macRemote.command('unapproved-session', { action: 'type', text: 'must not type' }); return false; } catch { return true; } });

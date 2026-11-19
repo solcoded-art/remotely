@@ -7,6 +7,8 @@ contextBridge.exposeInMainWorld('macRemote', {
   pins: scope => ipcRenderer.invoke('remote:pins', scope),
   pin: (scope, id, pin) => ipcRenderer.invoke('remote:pin', scope, id, pin),
   info: () => ipcRenderer.invoke('remote:info'),
+  openUpdate: service => ipcRenderer.invoke('remote:open-update', service),
+  notifyUpdate: (service, version) => ipcRenderer.invoke('remote:notify-update', service, version),
   sources: () => ipcRenderer.invoke('remote:sources'),
   selectDisplay: id => ipcRenderer.invoke('remote:select-display', id),
   approve: id => ipcRenderer.invoke('remote:approve', id),

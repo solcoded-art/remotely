@@ -72,3 +72,49 @@ test('native capture policy accepts Electron origin serialization without captur
     expect(await app.evaluate(() => (globalThis as any).probe.enumerations)).toBe(1);
   } finally { await app?.close(); await fs.rm(root, { recursive: true, force: true }); }
 });
+
+test('Mac app prompts for newer releases, opens only the download page, and blocks unsupported versions', async () => {
+  test.skip(process.platform !== 'darwin', 'The native Mac companion requires macOS.');
+  const fs = await import('node:fs/promises'); const os = await import('node:os');
+  const profile = await fs.mkdtemp(path.join(os.tmpdir(), 'remotely-desktop-update-'));
+  const profileArg = '--user-data-dir=' + profile;
+  const app = await electron.launch({ ...(process.env.MAC_APP_EXECUTABLE ? { executablePath: process.env.MAC_APP_EXECUTABLE, args: [profileArg] } : { args: [path.resolve('.'), profileArg] }), env: { ...process.env, ELECTRON_RUN_AS_NODE: undefined } as unknown as Record<string, string> });
+  try {
+    let release: Record<string, unknown> = { version: '9.9.9', available: true };
+    await app.context().route('**/api/downloads/mac', route => route.fulfill({ json: release }));
+    // Never open a real browser or post a real notification from the test.
+    await app.evaluate(({ shell, Notification }) => {
+      (globalThis as any).opened = []; (globalThis as any).notified = 0;
+      shell.openExternal = async (url: string) => { (globalThis as any).opened.push(url); };
+      Notification.prototype.show = function () { (globalThis as any).notified++; };
+    });
+    const page = await app.firstWindow();
+    const recheck = () => page.evaluate(() => window.dispatchEvent(new Event('remotely:check-updates')));
+    await expect(page.getByRole('heading', { name: 'Welcome back' })).toBeVisible();
+    await recheck();
+
+    const banner = page.getByRole('region', { name: 'Update available' });
+    await expect(banner).toBeVisible();
+    await expect(banner).toContainText('Remotely 9.9.9 is ready.');
+    await expect.poll(() => app.evaluate(() => (globalThis as any).notified)).toBe(1);
+    await banner.getByRole('button', { name: 'Download update' }).click();
+    await expect.poll(() => app.evaluate(() => (globalThis as any).opened)).toEqual([expect.stringMatching(/^https?:\/\/[^/]+\/download\/mac$/)]);
+    await expect(page.getByRole('button', { name: 'Send sign-in link', exact: true })).toBeVisible();
+
+    // "Later" hides this version, including after the next check.
+    await banner.getByRole('button', { name: 'Later' }).click();
+    await expect(banner).toHaveCount(0);
+    await recheck();
+    await expect(page.getByRole('region', { name: 'Update available' })).toHaveCount(0);
+    expect(await page.evaluate(() => localStorage.getItem('remotely.update-dismissed'))).toBe('9.9.9');
+
+    // An unsupported build gets a blocking prompt that cannot be postponed.
+    release = { version: '9.9.9', available: true, minimumSupportedVersion: '9.9.9' };
+    await recheck();
+    const dialog = page.getByRole('alertdialog', { name: 'Update required' });
+    await expect(dialog).toBeVisible();
+    await expect(dialog.getByRole('button', { name: 'Later' })).toHaveCount(0);
+    await expect(dialog.getByRole('button', { name: 'Download update' })).toBeVisible();
+    expect(await app.evaluate(() => (globalThis as any).notified)).toBe(1);
+  } finally { await app.close(); }
+});

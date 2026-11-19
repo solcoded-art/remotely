@@ -21,7 +21,7 @@ Use semantic HTML and existing primitives before introducing another UI dependen
 
 ## Layout and interaction rules
 
-- Tokens in `src/styles.css` control Satoshi, surfaces, text, borders, focus and spacing. Font loading is described in `fonts.md`.
+- Tokens in `src/styles.css` control Geist, the indigo brand palette, surfaces, text, borders, focus and spacing. Font loading is described in `fonts.md`.
 - Verify 320/390 CSS-pixel portrait, 844-pixel landscape, tablet and desktop; enlarge text and test WCAG text spacing. Avoid horizontal page scrolling and fixed-height text containers.
 - Use 44-pixel action targets where practical, visible keyboard focus, explicit labels, and reduced-motion handling. Cover forced colors and native text settings manually.
 - Do not trap page scrolling in a remote gesture surface unless the user interacts with that surface. Preserve button alternatives for gestures and dragging.

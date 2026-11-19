@@ -14,6 +14,3 @@ tests
 .env
 .env.*
 !.env.example
-
-# Fetch and verify the font in clean builds rather than copying a local cache.
-src/assets/fonts

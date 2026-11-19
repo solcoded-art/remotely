@@ -64,7 +64,7 @@ Read [Ongale deployment](docs/ongale-deployment.md), [native distribution](docs/
 
 ## UI foundations and hardening
 
-The setup and connection journey uses shared shadcn/ui components, locally bundled Satoshi, explicit permission/approval/playback states, and pointer/scroll alternatives to gestures. Both development and production builds fetch the pinned font when needed; see [font provenance and licensing](docs/hardening/fonts.md). Font binaries are excluded from this repository.
+The setup and connection journey uses shared shadcn/ui components, locally bundled Geist, explicit permission/approval/playback states, and pointer/scroll alternatives to gestures. Both development and production builds fetch the pinned font when needed; see [font provenance and licensing](docs/hardening/fonts.md). Font binaries are excluded from this repository.
 
 See the [hardening milestone](docs/hardening/README.md), [security/accessibility backlog](docs/hardening/baseline.md), [threat model](docs/hardening/threat-model.md), and [validation evidence](docs/hardening/validation.md). Automated accessibility checks are included in the browser suite; they do not establish complete ADA/WCAG compliance. Remote desktop screen-reader semantics remain outstanding.
 

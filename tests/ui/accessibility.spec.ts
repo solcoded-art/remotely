@@ -5,7 +5,7 @@ import { login } from './fixtures/account';
 
 test('login and documentation reflow with enlarged text and expose keyboard navigation', async ({ page }) => {
   await page.setViewportSize({ width: 320, height: 568 });
-  await page.goto('/');
+  await page.goto('/login');
   await expect(page.getByLabel('Email address')).toBeVisible();
   await page.keyboard.press('Tab');
   await expect(page.getByRole('link', { name: 'Skip to main content' })).toBeFocused();
@@ -14,7 +14,7 @@ test('login and documentation reflow with enlarged text and expose keyboard navi
   await page.keyboard.press('Enter');
   await expect(page.locator('main')).toBeFocused();
   await page.evaluate(() => document.fonts.ready);
-  expect(await page.evaluate(() => [...document.fonts].some(font => font.family === 'Satoshi' && font.status === 'loaded'))).toBe(true);
+  expect(await page.evaluate(() => [...document.fonts].some(font => font.family === 'Geist Variable' && font.status === 'loaded'))).toBe(true);
   await expectAccessible(page);
   await page.getByRole('button', { name: 'Advanced connection settings' }).click();
   await expect(page.getByLabel('Account server URL')).toBeVisible();
@@ -28,7 +28,7 @@ test('login and documentation reflow with enlarged text and expose keyboard navi
 });
 
 test('network failures offer actionable sign-in recovery without discarding email', async ({ page }) => {
-  await page.goto('/');
+  await page.goto('/login');
   await page.route('**/api/auth/magic-link', route => route.abort('failed'));
   await page.getByLabel('Email address').fill('network-test@example.com');
   await page.getByRole('button', { name: 'Send sign-in link', exact: true }).click();
@@ -101,7 +101,7 @@ test('email-link confirmation removes the URL token and waits for explicit conse
 test('email-link request journey is accessible and does not claim account existence', async ({ page }) => {
   await page.route('**/api/auth/config', route => route.fulfill({ json: { magicLink: true } }));
   await page.route('**/api/auth/magic-link', route => route.fulfill({ json: { status: 'ok' } }));
-  await page.setViewportSize({ width: 320, height: 568 }); await page.goto('/');
+  await page.setViewportSize({ width: 320, height: 568 }); await page.goto('/login');
   await expect(page.getByLabel('Password', { exact: true })).toHaveCount(0); await page.getByLabel('Email address').fill('email-test@example.com');
   await page.getByRole('button', { name: 'Send sign-in link' }).click(); await expect(page.getByRole('status')).toContainText('If this email is eligible');
   await expectAccessible(page); expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1)).toBe(true);
@@ -113,7 +113,7 @@ test('email delivery unavailability never switches signup or sign-in to password
   let ready = false; let requests = 0;
   await page.route('**/api/auth/config', route => route.fulfill({ json: { magicLink: ready } }));
   await page.route('**/api/auth/magic-link', route => { requests++; return route.fulfill({ json: { status: 'ok' } }); });
-  await page.goto('/'); await expect(page.getByText('Email sign-in is temporarily unavailable', { exact: true })).toBeVisible();
+  await page.goto('/login'); await expect(page.getByText('Email sign-in is temporarily unavailable', { exact: true })).toBeVisible();
   await expect(page.getByLabel('Password', { exact: true })).toHaveCount(0);
   await expect(page.getByRole('button', { name: 'Create an account', exact: true })).toHaveCount(0);
   await expect(page.getByRole('button', { name: 'Send sign-in link', exact: true })).toBeDisabled();
@@ -125,11 +125,40 @@ test('email delivery unavailability never switches signup or sign-in to password
 
 test('Cult controls keep keyboard targets usable with reduced motion', async ({ page }) => {
   await page.emulateMedia({ reducedMotion: 'reduce' });
-  await page.setViewportSize({ width: 390, height: 844 }); await page.goto('/');
+  await page.setViewportSize({ width: 390, height: 844 }); await page.goto('/login');
   await expect(page.getByRole('button', { name: 'Send sign-in link', exact: true })).toBeEnabled();
   await page.getByLabel('Email address').focus(); await expect(page.getByLabel('Email address')).toBeFocused();
   await page.getByRole('button', { name: 'Advanced connection settings', exact: true }).click();
   await expect(page.getByLabel('Account server URL')).toBeVisible();
   await expectAccessible(page);
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1)).toBe(true);
+});
+
+test('web landing page is accessible, reflows without horizontal scroll, and routes to sign-up, sign-in and docs', async ({ page }) => {
+  await page.route('**/api/auth/session', route => route.fulfill({ status: 401, json: { error: 'Not signed in.' } }));
+  await page.goto('/');
+  await expect(page.getByRole('heading', { level: 1 })).toContainText('Your whole Mac.');
+  await expect(page.getByLabel('Email address')).toHaveCount(0);
+  for (const [width, height] of [[320, 568], [390, 844], [1024, 768], [1440, 900]]) {
+    await page.setViewportSize({ width, height });
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1)).toBe(true);
+  }
+  await expect(page.getByRole('link', { name: 'Login' })).toHaveAttribute('href', '/login');
+  await expect(page.getByRole('link', { name: 'Read the docs' })).toHaveAttribute('href', '/docs/getting-started/');
+  await expect(page.getByRole('main').getByRole('link', { name: 'Get started' })).toHaveAttribute('href', '/signup');
+  await expectAccessible(page);
+  await page.screenshot({ path: 'artifacts/landing-desktop.png' });
+});
+
+test('sign-up and sign-in share the email-link form and switch without a reload', async ({ page }) => {
+  await page.route('**/api/auth/config', route => route.fulfill({ json: { magicLink: true } }));
+  await page.goto('/signup');
+  await expect(page.getByRole('heading', { name: 'Create your account' })).toBeVisible();
+  await expect(page.getByLabel('Password', { exact: true })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Create account', exact: true })).toBeEnabled();
+  await expectAccessible(page);
+  await page.getByRole('link', { name: 'Sign in', exact: true }).click();
+  await expect(page.getByRole('heading', { name: 'Welcome back' })).toBeVisible();
+  expect(new URL(page.url()).pathname).toBe('/login');
+  await expect(page.getByRole('button', { name: 'Send sign-in link', exact: true })).toBeEnabled();
 });

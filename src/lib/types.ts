@@ -21,7 +21,9 @@ declare global {
       sign(scope: string, message: string): Promise<string>;
       pins(scope: string): Promise<Record<string, Pin>>;
       pin(scope: string, id: string, value: Pin | null): Promise<void>;
-      info(): Promise<{ name: string; driverReady: boolean }>;
+      info(): Promise<{ name: string; driverReady: boolean; version?: string }>;
+      openUpdate?(service: string): Promise<void>;
+      notifyUpdate?(service: string, version: string): Promise<boolean>;
       sources(): Promise<DisplaySource[]>;
       selectDisplay(id: string): Promise<void>;
       approve(sessionId: string): Promise<void>;

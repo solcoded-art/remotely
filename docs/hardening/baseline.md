@@ -33,7 +33,7 @@ Passing these checks establishes only their tested behavior. It does not prove e
 - Permissions and driver status are checked without prompting at startup and refreshed on window focus. Choosing displays and prompting for Accessibility remain explicit actions.
 - Mac approval remains blocked by the checklist until account/display/permission/driver checks pass; native enforcement still provides the authoritative boundary.
 - Direction key labels are meaningful; keyboard/pointer buttons provide gesture alternatives, including one-pixel pointer steps and click-to-toggle drag.
-- Shared Satoshi typography, form descriptions, skip links, focus treatment, reduced motion, reflow and dialog sizing support the accessibility target. No ADA/WCAG compliance claim is made.
+- Shared Geist typography, form descriptions, skip links, focus treatment, reduced motion, reflow and dialog sizing support the accessibility target. No ADA/WCAG compliance claim is made.
 
 ## Assessment method and release gate
 

@@ -52,7 +52,7 @@ async function main() {
       await page.goto(url, { waitUntil: 'networkidle' });
       await page.getByRole('heading', { name: 'Welcome back' }).waitFor();
       await page.evaluate(() => document.fonts.ready);
-      assert.equal(await page.evaluate(() => [...document.fonts].some(font => font.family === 'Satoshi' && font.status === 'loaded')), true);
+      assert.equal(await page.evaluate(() => [...document.fonts].some(font => font.family === 'Geist Variable' && font.status === 'loaded')), true);
       assert.deepEqual(errors, []);
       fs.mkdirSync('artifacts', { recursive: true });
       await page.screenshot({ path: 'artifacts/production-build.png', fullPage: true });

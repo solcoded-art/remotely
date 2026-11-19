@@ -8,7 +8,7 @@ async function noOverflow(page: Page) {
 }
 
 test('login is responsive at small phone, phone, landscape, and desktop sizes', async ({ page }) => {
-  await page.goto('/');
+  await page.goto('/login');
   for (const [width, height] of [[320, 568], [390, 844], [844, 390], [1280, 900]]) {
     await page.setViewportSize({ width, height }); await noOverflow(page);
     await expect(page.getByLabel('Email address')).toBeVisible();
@@ -183,7 +183,7 @@ test('real login and WebRTC connection with a synthetic desktop capture', async 
 
 test('the app links to a dedicated public setup guide instead of showing installation instructions inline', async ({ page }) => {
   await page.route('**/api/downloads/mac', route => route.fulfill({ json: { available: true } }));
-  await page.goto('/');
+  await page.goto('/login');
   await expect(page.getByText('Mac app required', { exact: true })).toBeVisible();
   await expect(page.getByRole('link', { name: 'Read setup guide' })).toHaveAttribute('href', 'http://127.0.0.1:5173/docs/getting-started/');
   await expect(page.getByText('Sign in and choose a display', { exact: true })).toHaveCount(0);

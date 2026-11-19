@@ -47,6 +47,8 @@ async function createService(options = {}) {
     } catch { return false; }
   }
   const publicDir = path.resolve(__dirname, '../dist');
+  // Client-side pages that load the app shell (sign-in/sign-up on the web).
+  const appRoutes = new Set(['/login', '/signin', '/signup', '/get-started']);
   const downloads = createDownloads();
   const peers = new Map();
   const sessions = new Map();
@@ -116,7 +118,7 @@ async function createService(options = {}) {
       if (['/api/health', '/health'].includes(route) && req.method === 'GET') return json(200, { status: 'ok', deviceTrust: 1 });
       if (req.method === 'GET' && route === '/docs/getting-started') { res.writeHead(308, { Location: '/docs/getting-started/' }); res.end(); return; }
       if (req.method === 'GET' && !route.startsWith('/api/') && route !== '/ws') {
-        const relative = route === '/' ? '/index.html' : route === '/docs/getting-started/' ? '/docs/getting-started/index.html' : decodeURIComponent(route);
+        const relative = route === '/' || appRoutes.has(route) ? '/index.html' : route === '/docs/getting-started/' ? '/docs/getting-started/index.html' : decodeURIComponent(route);
         const file = path.resolve(publicDir, '.' + relative);
         if (!file.startsWith(publicDir + path.sep)) throw fail(403, 'Forbidden.');
         try {

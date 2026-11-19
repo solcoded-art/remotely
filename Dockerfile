@@ -4,8 +4,6 @@ ENV ELECTRON_SKIP_BINARY_DOWNLOAD=1
 COPY package.json package-lock.json ./
 RUN npm ci --ignore-scripts
 COPY tsconfig.json vite.config.ts index.html components.json capacitor.config.ts release.config.json ./
-COPY fonts.source.json ./
-COPY scripts/prepare-fonts.cjs ./scripts/prepare-fonts.cjs
 COPY src ./src
 COPY shared ./shared
 COPY public ./public
