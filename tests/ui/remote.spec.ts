@@ -22,7 +22,7 @@ test('real login and WebRTC connection with a synthetic desktop capture', async 
   await installMacFixture(desktopContext);
   const desktop = await desktopContext.newPage(); const phone = await phoneContext.newPage();
   const email = `browser-${Date.now()}@example.com`;
-  await login(desktop, email, true);
+  await login(desktop, email);
   await desktop.getByRole('button', { name: 'Choose display', exact: true }).click();
   await desktop.getByRole('button', { name: 'Main display' }).click();
   await login(phone, email);
@@ -205,7 +205,7 @@ test('phone visitors get installation guidance in documentation and links from t
     }
     await page.setViewportSize({ width: 390, height: 844 });
     await page.screenshot({ path: 'artifacts/docs-phone.png', fullPage: true });
-    await login(page, `setup-${Date.now()}@example.com`, true);
+    await login(page, `setup-${Date.now()}@example.com`);
     await expect(page.getByRole('link', { name: 'Read setup guide' })).toBeVisible();
     await expect(page.getByRole('button', { name: 'Copy Mac setup link' })).toHaveCount(0);
     await noOverflow(page);
@@ -244,7 +244,7 @@ test('a wrong pairing secret and a signaling relay that changes the Mac certific
   const desktop = await desktopContext.newPage(); const phone = await phoneContext.newPage();
   try {
     const email = `tamper-${Date.now()}@example.com`;
-    await login(desktop, email, true); await login(phone, email);
+    await login(desktop, email); await login(phone, email);
     await desktop.getByRole('button', { name: 'Create pairing link', exact: true }).click();
     const original = await desktop.getByLabel('One-use pairing link', { exact: true }).inputValue();
     const wrong = new URL(original);

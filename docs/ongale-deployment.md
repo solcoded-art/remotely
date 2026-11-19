@@ -68,7 +68,7 @@ Use the same idempotency key when retrying platform changes. Preserve the Ongale
 
 - Deploy one process. Accounts and devices persist in PostgreSQL; presence, rate-limit buckets, and active WebRTC negotiation state are in memory. A redeploy disconnects sessions and requires fresh Mac approval. Horizontal scaling requires shared signaling/pubsub and distributed limits.
 - New clients request sessions of up to 30 days with persistent browser cookies or native OS-protected storage. Old clients keep the one-day lifetime. See [authentication](authentication.md) for compatibility and rollout requirements.
-- Better Auth magic links verify inbox access when the secret, public origin and SMTP settings are configured. Password signup remains unverified for legacy compatibility. Password-reset and MFA flows remain outstanding. Configure outbound sending separately from an inbox; development tests use a fake mailer.
+- Better Auth magic links verify inbox access when the secret, public origin and SMTP settings are configured. Updated clients use email-only signup/sign-in. Legacy password endpoints remain available only for older clients; password signup through those endpoints remains unverified. Password-reset and MFA flows remain outstanding. Configure outbound sending separately from an inbox; development tests use a fake mailer.
 - Native iPhone video playback, macOS Accessibility/Screen Recording grants, multi-monitor selection, NAT traversal, and mobile carrier networks still require physical-device validation.
 - This directory includes all eight official skills with a source/hash manifest. Storage, media, email, and repair skills are available for later use; copying them is not evidence that those services are enabled.
 

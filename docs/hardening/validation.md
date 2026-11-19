@@ -90,3 +90,10 @@ Date: 2026-11-19. Local candidate validation before commit/deployment. Native in
 | Source hygiene | `git diff --check` passed. The managed Ongale workflow is unchanged. No SMTP values, auth secrets, login credentials, generated profiles or artifacts are committed. |
 
 No real outbound mail was sent. Ongale's domain sending/SMTP bindings, actual mailbox delivery, compatible Mac installer publication, physical iOS behavior and independent security/accessibility review remain unverified. The first inbox proof for an unverified account removes the unproven password and signs out other devices; existing user and pairing identities remain. See [authentication](../authentication.md) for migration and rollout details.
+
+
+## Email-only signup and sign-in follow-up
+
+Date: 2026-11-19. The updated client no longer renders password inputs, password-mode switches or a separate password signup form. Email availability failures show an explicit unavailable state with a retry; they do not select password login. Sending, pasting, confirming and resending email links are the client journey. Older installed clients retain their compatibility API.
+
+`npm test` passed all 29 server/security tests. `npm run test:ui` passed all 16 tests with real Better Auth signup/sign-in/verification and a fake local mailbox, including both browser contexts, actual Electron encrypted login restoration/sign-out, persistent HttpOnly web sessions, unavailable/retry behavior, selected axe rules and mobile reflow. No real email was sent. Native capture and input remain synthetic/mocked in the two-peer browser journey. TypeScript/Vite build and iOS asset/plugin sync passed; physical iOS and outbound SMTP delivery remain unverified. Production activation is tracked separately; the earlier auth deploy's workflow warning records that image pull did not complete within its 30-minute wait.

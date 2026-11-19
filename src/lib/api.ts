@@ -1,5 +1,3 @@
-import type { Auth } from './types';
-
 export function serviceURL(raw: string) {
   const url = new URL(raw);
   if (url.username || url.password || url.search || url.hash || !['', '/'].includes(url.pathname)) throw Error('Use the server origin, such as https://remote.example.com.');
@@ -24,9 +22,4 @@ export async function request<T>(service: string, route: string, options: { toke
   try { data = await response.json(); } catch { throw Error('The account server did not return JSON. Check its URL.'); }
   if (!response.ok) throw Object.assign(Error(data.error || 'The request failed.'), { status: response.status });
   return data;
-}
-
-export async function signIn(service: string, email: string, password: string, register: boolean) {
-  const result = await request<Omit<Auth, 'service'>>(service, `/api/auth/${register ? 'register' : 'login'}`, { method: 'POST', data: { email, password, remember: true } });
-  return { ...result, service };
 }

@@ -1,5 +1,6 @@
 import { test, expect, _electron as electron } from '@playwright/test';
 import path from 'node:path';
+import { login } from './fixtures/account';
 
 test('native desktop shell boots with isolated renderer and authenticated API access', async () => {
   test.skip(process.platform !== 'darwin', 'The native Mac companion requires macOS.');
@@ -13,13 +14,7 @@ test('native desktop shell boots with isolated renderer and authenticated API ac
     await expect(page.getByText('Mac app', { exact: true })).toBeVisible();
     expect(await page.evaluate(() => typeof (window as any).require)).toBe('undefined');
     expect(await page.evaluate(() => (window as any).macRemote.platform)).toBe('mac');
-    await page.getByRole('button', { name: 'Advanced connection settings' }).click();
-    await page.getByLabel('Account server URL').fill('http://127.0.0.1:3000');
-    await page.getByRole('button', { name: 'Create an account', exact: true }).click();
-    await page.getByLabel('Email address').fill(`native-${Date.now()}@example.com`);
-    await page.getByLabel('Password', { exact: true }).fill('native-test-password-123');
-    await page.getByRole('button', { name: 'Create account', exact: true }).click();
-    await expect(page.getByText('Signed in', { exact: true })).toBeVisible();
+    await login(page, `native-${Date.now()}@example.com`, { navigate: false });
     await expect(page.getByRole('heading', { name: 'Share your workspace' })).toBeVisible();
     const denied = await page.evaluate(async () => {
       try { await (window as any).macRemote.command('unapproved-session', { action: 'type', text: 'must not type' }); return false; }
