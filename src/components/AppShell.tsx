@@ -1,8 +1,8 @@
 import type { ReactNode } from 'react';
-import { Monitor } from 'lucide-react';
 
-export function Brand() {
-  return <div className="brand"><span className="brand-mark" aria-hidden="true"><Monitor size={19} strokeWidth={1.8} /></span>Mac Remote</div>;
+export function Brand({ href }: { href?: string }) {
+  const artwork = <><img className="brand-logo" src="/icons/remotely-logo-5.svg" width="210" height="48" alt="Remotely" /><span className="brand-fallback">Remotely</span></>;
+  return href ? <a href={href} className="brand" aria-label="Remotely home">{artwork}</a> : <div className="brand">{artwork}</div>;
 }
 
 export function AppShell({ children, actions }: { children: ReactNode; actions?: ReactNode }) {

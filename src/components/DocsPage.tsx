@@ -1,11 +1,12 @@
-import { ArrowLeft, Monitor } from 'lucide-react';
+import { ArrowLeft } from 'lucide-react';
+import { Brand } from '@/components/AppShell';
 import { Button } from '@/components/ui/button';
 import { MacSetupInstructions } from './MacSetup';
 
 export function DocsPage() {
   return <div className="app-shell">
     <a className="skip-link" href="#main-content">Skip to main content</a>
-    <header className="app-header"><a href="/" className="brand"><span className="brand-mark"><Monitor size={19} /></span>Mac Remote</a><Button asChild variant="outline"><a href="/"><ArrowLeft size={15} />Back to app</a></Button></header>
+    <header className="app-header"><Brand href="/" /><Button asChild variant="outline"><a href="/"><ArrowLeft size={15} />Back to app</a></Button></header>
     <main className="docs-page" id="main-content" tabIndex={-1}>
       <div className="eyebrow">Documentation</div><h1 className="page-title">Get your Mac ready to connect</h1>
       <p className="docs-lead">Install the Mac app once, then control your Mac from this website on your phone. You do not need to run terminal commands or start a local server.</p>

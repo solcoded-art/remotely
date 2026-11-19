@@ -46,7 +46,8 @@ main:focus, .page-title:focus { outline: none; }
 .app-header { flex-wrap: wrap; min-height: 80px; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 14px var(--space-page); }
 .header-actions { margin-inline-start: auto; display: flex; align-items: center; gap: 12px; min-width: 0; }
 .brand { display: flex; align-items: center; gap: 10px; font-size: 1.0625rem; font-weight: 700; letter-spacing: -.025em; }
-.brand-mark { width: 36px; height: 36px; display: grid; place-items: center; background: var(--primary); color: #10291c; border-radius: 11px; }
+.brand-logo { display: block; width: auto; height: 40px; max-width: 100%; object-fit: contain; }
+.brand-fallback { display: none; }
 .eyebrow { font-size: .75rem; letter-spacing: .1em; text-transform: uppercase; color: var(--muted-foreground); font-weight: 650; }
 .muted { color: var(--muted-foreground); }
 .status-dot { display: inline-block; flex-shrink: 0; width: 7px; height: 7px; border-radius: 100%; background: var(--muted-foreground); margin-right: 7px; }
@@ -168,7 +169,7 @@ main:focus, .page-title:focus { outline: none; }
 }
 @media (max-width: 480px) {
   .app-header { min-height: 68px; gap: 8px; padding-top: 10px; padding-bottom: 10px; }
-  .header-actions { gap: 4px; } .brand { font-size: .9375rem; gap: 8px; } .brand-mark { width: 32px; height: 32px; }
+  .header-actions { gap: 4px; } .brand { font-size: .9375rem; gap: 8px; } .brand-logo { height: 32px; }
   .device-card { flex-wrap: wrap; padding: 16px; gap: 12px; } .device-card > button { width: 100%; }
   .device-info { flex-basis: calc(100% - 60px); }
   .setup-actions > button { flex: 1 1 100%; }
@@ -180,4 +181,4 @@ main:focus, .page-title:focus { outline: none; }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation: none !important; transition: none !important; scroll-behavior: auto !important; }
 }
-@media (forced-colors: active) { .source-card.selected, .app-row.active { outline: 2px solid Highlight; } .setup-step-marker, .brand-mark { border: 1px solid ButtonText; } }
+@media (forced-colors: active) { .source-card.selected, .app-row.active { outline: 2px solid Highlight; } .setup-step-marker { border: 1px solid ButtonText; } .brand-logo { display: none; } .brand-fallback { display: inline; } }

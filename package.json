@@ -1,7 +1,7 @@
 {
   "name": "ios-remote",
   "productName": "Mac Remote",
-  "version": "0.2.3",
+  "version": "0.2.4",
   "private": true,
   "description": "An account-paired iOS remote and Mac companion using WebRTC",
   "main": "desktop/main.cjs",
@@ -29,7 +29,8 @@
     "predev": "npm run fonts:prepare",
     "desktop:seal": "node scripts/seal-mac.cjs",
     "desktop:verify": "node scripts/verify-mac.cjs",
-    "desktop:smoke": "node scripts/smoke-mac.cjs"
+    "desktop:smoke": "node scripts/smoke-mac.cjs",
+    "icons:brand": "node scripts/build-brand-icons.cjs && npm run icons:ios"
   },
   "keywords": [
     "mac-remote",
@@ -87,7 +88,7 @@
       }
     ],
     "mac": {
-      "icon": "public/icons/icon-512.png",
+      "icon": "public/icons/icon-1024.png",
       "category": "public.app-category.productivity",
       "hardenedRuntime": true,
       "entitlements": "desktop/entitlements.mac.plist",

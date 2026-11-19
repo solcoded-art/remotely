@@ -3,7 +3,7 @@ import CoreGraphics
 import ImageIO
 
 // Reuse the existing artwork and flatten its transparent corners for Apple's icon catalog.
-let source = URL(fileURLWithPath: "public/icons/icon-512.png")
+let source = URL(fileURLWithPath: "public/icons/icon-1024.png")
 let output = URL(fileURLWithPath: "ios/App/App/Assets.xcassets/AppIcon.appiconset/AppIcon-512@2x.png")
 guard let reader = CGImageSourceCreateWithURL(source as CFURL, nil),
       let image = CGImageSourceCreateImageAtIndex(reader, 0, nil),
@@ -11,7 +11,7 @@ guard let reader = CGImageSourceCreateWithURL(source as CFURL, nil),
       let context = CGContext(data: nil, width: 1024, height: 1024, bitsPerComponent: 8, bytesPerRow: 4096, space: space, bitmapInfo: CGImageAlphaInfo.noneSkipLast.rawValue) else {
     fputs("Could not read app artwork or prepare its canvas.\n", stderr); exit(1)
 }
-context.setFillColor(CGColor(red: 16.0/255, green: 17.0/255, blue: 19.0/255, alpha: 1))
+context.setFillColor(CGColor(srgbRed: 29.0/255, green: 78.0/255, blue: 216.0/255, alpha: 1))
 context.fill(CGRect(x: 0, y: 0, width: 1024, height: 1024))
 context.interpolationQuality = .high
 context.draw(image, in: CGRect(x: 0, y: 0, width: 1024, height: 1024))
