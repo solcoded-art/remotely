@@ -1,5 +1,7 @@
 Apple Silicon developer beta. macOS 13 or newer. **No Apple Developer ID signature or notarization:** macOS may still block this app. No Intel build is included.
 
+Version 0.3.2 brings the new Remotely design to the Mac app: Geist type, the indigo theme, and a redesigned email sign-in with the same magic-link flow (paste a sign-in link, advanced server address). It also adds update prompts: the app checks for newer releases on launch, every six hours and when its window regains focus, then shows an **Update available** banner and one macOS notification per version. **Download update** opens only this service’s Mac download page; the app still does not install updates itself. Earlier versions have no update prompt, so download 0.3.2 manually once. Pairing, device keys and session approval are unchanged from 0.3.1, and no re-pairing is needed.
+
 Version 0.3.1 fixes screen capture being rejected after local approval: Electron serializes the bundled origin with a trailing slash. Capture still requires the approved session, selected screen and trusted main frame. Setup/capture errors now remain visible instead of being overwritten by “Mac declined the connection”.
 
 Version 0.3.0 introduced cryptographically paired installations. It adds protected device keys, one-use QR/link pairing with explicit Mac approval, signed session challenges and WebRTC negotiation, and revocation that ends an active session. Account-only 0.2.x clients are incompatible: update both clients and pair once. Device pairing is separate from account MFA, which is not implemented yet.
