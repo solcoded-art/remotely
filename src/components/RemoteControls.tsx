@@ -11,9 +11,9 @@ const launchers = [
   ['VS Code', 'com.microsoft.VSCode', Code2], ['Cursor', 'com.todesktop.230313mzl4w4u92', Code2],
   ['Zed', 'dev.zed.Zed', Code2], ['Terminal', 'com.apple.Terminal', Terminal],
 ] as const;
-const shortcuts = [['⌘ Tab', 48, ['cmd']], ['⌘ Space', 49, ['cmd']], ['Escape', 53, []], ['⌘ C', 8, ['cmd']], ['⌘ V', 9, ['cmd']], ['⌘ Z', 6, ['cmd']], ['⌘ W', 13, ['cmd']], ['Return', 36, []], ['Delete', 51, []]] as const;
+const shortcuts = [['Tab', 48, []], ['Shift Tab', 48, ['shift']], ['Next tab', 48, ['ctrl']], ['Prev tab', 48, ['ctrl', 'shift']], ['⌘ Tab', 48, ['cmd']], ['⌘ Space', 49, ['cmd']], ['Escape', 53, []], ['⌘ C', 8, ['cmd']], ['⌘ V', 9, ['cmd']], ['⌘ Z', 6, ['cmd']], ['⌘ W', 13, ['cmd']], ['Return', 36, []], ['Delete', 51, []]] as const;
 
-const shortcutNames: Record<string, string> = { '⌘ Tab': 'Switch apps (Command Tab)', '⌘ Space': 'Open Spotlight (Command Space)', '⌘ C': 'Copy (Command C)', '⌘ V': 'Paste (Command V)', '⌘ Z': 'Undo (Command Z)', '⌘ W': 'Close window (Command W)' };
+const shortcutNames: Record<string, string> = { 'Tab': 'Move focus forward (Tab)', 'Shift Tab': 'Move focus backward (Shift Tab)', 'Next tab': 'Next tab (Control Tab)', 'Prev tab': 'Previous tab (Control Shift Tab)', '⌘ Tab': 'Switch apps (Command Tab)', '⌘ Space': 'Open Spotlight (Command Space)', '⌘ C': 'Copy (Command C)', '⌘ V': 'Paste (Command V)', '⌘ Z': 'Undo (Command Z)', '⌘ W': 'Close window (Command W)' };
 
 export function RemoteControls({ connection, connected, apps }: { connection: Connection; connected: boolean; apps: RunningApp[] }) {
   const [text, setText] = useState('');
@@ -47,6 +47,7 @@ export function RemoteControls({ connection, connected, apps }: { connection: Co
         <form className="flex gap-2" onSubmit={sendText}><Input value={text} onChange={event => setText(event.target.value)} placeholder="Type or paste text…" aria-label="Text to send" maxLength={4096} disabled={!connected} autoCapitalize="none" autoCorrect="off" /><Button size="icon" aria-label="Send text" disabled={!connected || !text}><Send size={16} /></Button></form>
         <p className="mt-2 text-sm leading-5 text-muted-foreground">Click the editor or text field on your Mac first.</p>
         <div className="eyebrow mb-3 mt-6">Shortcuts</div><div className="shortcut-grid">{shortcuts.map(([label, code, modifiers]) => <Button variant="outline" className="px-1 text-xs" key={label} aria-label={shortcutNames[label] ? `${label}: ${shortcutNames[label]}` : label} disabled={!connected} onClick={() => connection.sendCommand({ action: 'key', code, modifiers: [...modifiers] })}>{label}</Button>)}</div>
+        <p className="mt-3 text-sm leading-5 text-muted-foreground">Tab and Shift Tab move focus. Next tab and Prev tab send Control Tab and Control Shift Tab to the active Mac app; behavior depends on that app.</p>
         <div className="mt-3 grid grid-cols-4 gap-2">{([[ArrowLeft, 123, 'Left arrow key'], [ArrowUp, 126, 'Up arrow key'], [ArrowDown, 125, 'Down arrow key'], [ArrowRight, 124, 'Right arrow key']] as const).map(([Arrow, code, label]) => <Button variant="secondary" key={code} disabled={!connected} aria-label={label} onClick={() => connection.sendCommand({ action: 'key', code, modifiers: [] })}><Arrow size={16} aria-hidden="true" /></Button>)}</div>
       </TabsContent>
     </Tabs>

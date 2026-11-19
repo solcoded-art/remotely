@@ -74,6 +74,14 @@ test('real login and WebRTC connection with a synthetic desktop capture', async 
     await phone.screenshot({ path: `artifacts/session-${width}.png`, fullPage: true });
   }
   await phone.getByRole('tab', { name: 'Keys', exact: true }).click();
+  for (const [label, modifiers] of [['Tab', []], ['Shift Tab', ['shift']], ['Next tab', ['ctrl']], ['Prev tab', ['ctrl', 'shift']]] as const) {
+    await phone.getByRole('button', { name: new RegExp('^' + label + ':') }).click();
+    await expect.poll(() => desktop.evaluate(expected => (window as any).commands.some((value: any) => value.action === 'key' && value.code === 48 && JSON.stringify(value.modifiers) === JSON.stringify(expected)), [...modifiers])).toBe(true);
+  }
+  await phone.setViewportSize({ width: 320, height: 568 }); await noOverflow(phone);
+  await expectAccessible(phone);
+  await phone.screenshot({ path: 'artifacts/keyboard-tab-shortcuts-320.png', fullPage: true });
+
   await phone.getByLabel('Text to send').fill('Hello 世界 👋');
   await phone.getByRole('button', { name: 'Send text', exact: true }).click();
   await expect.poll(() => desktop.evaluate(() => (window as any).commands.some((value: any) => value.action === 'type' && value.text === 'Hello 世界 👋'))).toBe(true);
