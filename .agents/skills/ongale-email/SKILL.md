@@ -50,9 +50,9 @@ msg["To"], msg["Subject"] = to, subject
 msg.set_content(text)
 
 with smtplib.SMTP(os.environ["SMTP_HOST"], int(os.environ["SMTP_PORT"])) as s:
-    s.starttls()
-    s.login(os.environ["SMTP_USER"], os.environ["SMTP_PASSWORD"])
-    s.send_message(msg)
+  s.starttls()
+  s.login(os.environ["SMTP_USER"], os.environ["SMTP_PASSWORD"])
+  s.send_message(msg)
 ```
 
 ## Go (net/smtp)

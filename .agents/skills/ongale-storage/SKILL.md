@@ -45,9 +45,14 @@ const url = await getSignedUrl(s3, new GetObjectCommand({ Bucket, Key: key }), {
 import os, boto3
 from botocore.config import Config
 
-s3 = boto3.client("s3", config=Config(s3={"addressing_style": "path"}),
-    endpoint_url=os.environ["S3_ENDPOINT"], region_name=os.environ["S3_REGION"],
-    aws_access_key_id=os.environ["S3_ACCESS_KEY_ID"], aws_secret_access_key=os.environ["S3_SECRET_ACCESS_KEY"])
+s3 = boto3.client(
+  "s3",
+  config=Config(s3={"addressing_style": "path"}),
+  endpoint_url=os.environ["S3_ENDPOINT"],
+  region_name=os.environ["S3_REGION"],
+  aws_access_key_id=os.environ["S3_ACCESS_KEY_ID"],
+  aws_secret_access_key=os.environ["S3_SECRET_ACCESS_KEY"],
+)
 bucket = os.environ["S3_BUCKET"]
 
 s3.upload_fileobj(fileobj, bucket, key, ExtraArgs={"ContentType": content_type})

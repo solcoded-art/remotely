@@ -16,9 +16,9 @@ Use it for the media the code ships with (design images, product photos, video, 
 1. Put the files under `media/` at the repository root, in any subfolders (`media/products/mug.jpg`). To sync other folders, list them in `ongale.json` at the root: `{"media": ["public/images", "assets/video"]}`. The list replaces `media/`; add `"media"` to it to keep it too.
 2. Reference the files by their path from the repository root, starting with `/`: `/media/products/mug.jpg`. A relative `media/mug.jpg` only works on pages at the site's root. Spaces and other characters in file names work; keep the exact spelling and case.
 3. Optionally, use the CDN address directly, which saves the redirect: read it from the build's manifest, `ongale-media.json`, with a small helper (below). Add `ongale-media.json` to `.gitignore`, since the workflow writes it before each build, and don't exclude it in a `.dockerignore`.
-4. Push. The repository's **Actions** run shows "Synced N media files (M images as WebP)" in the **Sync media to Ongale** step, and a warning for each file it left out.
+4. Push. The repository's **Actions** run shows "Synced N media files (M images as WebP)" in the **Sync media to Ongale** step, and a warning for each file it left out. If it shows `Media wasn't synced: HTTP Error 403: Forbidden`, the repository has an older Ongale workflow: merge the **Update Ongale deploy workflow** pull request (or `git pull`, if Ongale committed it) and push again.
 
-Synced types, up to these sizes per file: PNG, JPEG, WebP, GIF and AVIF images (50 MB); MP4 and WebM video (1 GB); MP3, OGG and WAV audio (50 MB); WOFF2 fonts (5 MB). Images are stored as WebP (below); GIFs, video, audio and fonts as they are. Other files (SVG, PDF, CSS) aren't synced and stay in the app as before. Hidden files are skipped.
+Synced types, up to these sizes per file: PNG, JPEG, WebP, GIF and AVIF images (50 MB); MP4 and WebM video (1 GB); MP3, OGG and WAV audio (50 MB); WOFF2 fonts (5 MB). Images are stored as WebP (below); GIFs, video, audio and fonts as they are, except that an MP4 whose index sits at its end is made to start fast in the Actions run (no re-encoding). If the step warns `ffmpeg isn't available` for an MP4, export it with *fast start* (or *web optimized*) on and commit that file. Videos are served as files (no streaming), and seeking works. Other files (SVG, PDF, CSS) aren't synced and stay in the app as before. Hidden files are skipped.
 
 ## What the app gets
 
@@ -118,12 +118,13 @@ A static site packed from the repository root leaves the files that synced out o
 import json, pathlib
 
 try:
-    MANIFEST = json.loads((pathlib.Path(__file__).parent / "ongale-media.json").read_text())
+  MANIFEST = json.loads((pathlib.Path(__file__).parent / "ongale-media.json").read_text())
 except (OSError, ValueError):
-    MANIFEST = {}
+  MANIFEST = {}
+
 
 def media(path: str) -> str:
-    return MANIFEST.get(path, "/" + path)
+  return MANIFEST.get(path, "/" + path)
 ```
 
 Put `media.py` at the repository root, or adjust the path to the manifest. In Django, register `media` as a template global or context processor. Don't confuse it with Django's own `MEDIA_URL` setting for user uploads.

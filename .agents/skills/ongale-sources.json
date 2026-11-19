@@ -1,10 +1,10 @@
 {
-  "retrieved": "2026-11-16",
+  "retrieved": "2026-11-19",
   "skills": [
     {
       "name": "ongale-app-ready",
       "url": "https://ongale.com/skills/ongale-app-ready/SKILL.md",
-      "sha256": "6a3190f6525f11f2c98040bf4fd60a339899927258212e6b8b7c108cbaf6beb6"
+      "sha256": "9da6985839369667304bef15ba903ac5453b22e5f45653ab5245aa668a7a7dcb"
     },
     {
       "name": "ongale-continue-app",
@@ -14,32 +14,32 @@
     {
       "name": "ongale-deploy",
       "url": "https://ongale.com/skills/ongale-deploy/SKILL.md",
-      "sha256": "4c604bce1747849a4617d0de01abd837ac6f43c8d780f37a82684ca76c952d08"
+      "sha256": "b33d1cf15bc7444158c3fe50b3a43cacf45b05039b9d772143117a70ff935349"
     },
     {
       "name": "ongale-email",
       "url": "https://ongale.com/skills/ongale-email/SKILL.md",
-      "sha256": "dc086796cc9e859f2c01bc18cc074f7cd70f52482511b28115c616abb180fa6e"
+      "sha256": "930e2ee40ceb4c8af58296454aea64603ff1f0dd26ecdf283229cdfbef9463e8"
     },
     {
       "name": "ongale-fix-deploy",
       "url": "https://ongale.com/skills/ongale-fix-deploy/SKILL.md",
-      "sha256": "844b2946d635662c71046caf8f2b69511885b53c6d9b9fa1c96d2f17376c98a3"
+      "sha256": "e12086baf1a56d331fa08c6642545ed9ea4196ff3b83de9242c7417de4a31a14"
     },
     {
       "name": "ongale-mcp",
       "url": "https://ongale.com/skills/ongale-mcp/SKILL.md",
-      "sha256": "1f325a043fe017567efb6e8365970206d3dfffa8dfc848f33517adb9fff894ba"
+      "sha256": "2ceff5c444a8306a2378b221ec6573b11726ad376a7c27c35bcd44b3d19922df"
     },
     {
       "name": "ongale-media",
       "url": "https://ongale.com/skills/ongale-media/SKILL.md",
-      "sha256": "16d4639db6d78d88cd3cb976bca57c60e0ca1eddfa3ea5884c86cf05b52464b6"
+      "sha256": "17b2854ab5d89542a64271e765138dee60a7223e242558928ade20e55cb58dfa"
     },
     {
       "name": "ongale-storage",
       "url": "https://ongale.com/skills/ongale-storage/SKILL.md",
-      "sha256": "e2e969ba47f7c948d347f77fa96ece3bf3eb2b9e3e5a26d8323f1298471996ed"
+      "sha256": "1e6d4857cbeb83186e16f8ff71a90670c8952919117dc7491c53822a61efc2d2"
     }
   ]
 }

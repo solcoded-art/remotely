@@ -34,7 +34,7 @@ On the sign-in page only the "see" permissions are ticked. To deploy, the user a
 | Area | Tools |
 | --- | --- |
 | Workspace | `workspace_get`, `activity_list`, `run_get`, `usage_get`, `traffic_get`, `billing_get`, `billing_portal_link` |
-| Apps | `apps_list`, `app_get`, `app_logs_recent`, `app_metrics`, `app_releases_list`, `app_deploy`, `app_rollback`, `app_start`, `app_stop`, `app_env_list`, `app_env_set`, `app_env_delete`, `app_healthcheck_set`, `app_delete` |
+| Apps | `apps_list`, `app_get`, `app_logs_recent`, `app_metrics`, `app_releases_list`, `app_deploy`, `app_rollback`, `app_start`, `app_stop`, `app_env_list`, `app_env_set`, `app_env_delete`, `app_healthcheck_set`, `app_readiness_set`, `app_delete` |
 | New apps | `app_create_from_code` (code written in this chat), `app_create_from_github`, `app_create_from_image`, `github_connect_link` |
 | Code | `github_repos_list`, `code_tree`, `code_read`, `code_commit` (see `ongale-continue-app`) |
 | Databases | `databases_list`, `database_schema`, `database_query` (read-only), `database_create`, `database_bind`, `database_execute`, `cache_get` |
