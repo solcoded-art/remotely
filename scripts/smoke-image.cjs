@@ -50,6 +50,8 @@ async function main() {
       page.on('pageerror', error => errors.push(error.message));
       page.on('response', response => { if (response.url().includes('/assets/') && !response.ok()) errors.push('Asset failed: ' + response.status()); });
       await page.goto(url, { waitUntil: 'networkidle' });
+      await page.getByRole('heading', { level: 1, name: /Your whole Mac/ }).waitFor();
+      await page.goto(url + '/login', { waitUntil: 'networkidle' });
       await page.getByRole('heading', { name: 'Welcome back' }).waitFor();
       await page.evaluate(() => document.fonts.ready);
       assert.equal(await page.evaluate(() => [...document.fonts].some(font => font.family === 'Geist Variable' && font.status === 'loaded')), true);
