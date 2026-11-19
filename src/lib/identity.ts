@@ -1,5 +1,7 @@
 import { b64, encode, keyId, publicKey, type PublicKey } from '../../shared/trust.mjs';
 import type { Auth } from './types';
+import { Capacitor } from '@capacitor/core';
+import { storageService } from '../../shared/account-service.mjs';
 
 export type Pin = { grantId: string; key: PublicKey; name: string };
 export type Identity = { id: string; publicKey: PublicKey; sign(message: string): Promise<string>; pins(): Promise<Record<string, Pin>>; pin(id: string, value: Pin | null): Promise<void> };
@@ -12,7 +14,10 @@ function database(): Promise<IDBDatabase> {
   });
 }
 export function deviceIdentity(auth: Auth): Promise<Identity> {
-  const scope = JSON.stringify([auth.service, auth.user.id]);
+  // Native apps key device identities by a stable storage service, so the move
+  // to enftify.com keeps existing device keys and pairings.
+  const native = !!window.macRemote || Capacitor.isNativePlatform();
+  const scope = JSON.stringify([native ? storageService(auth.service) : auth.service, auth.user.id]);
   if (!pending.has(scope)) pending.set(scope, load(scope).catch(error => { pending.delete(scope); throw error; }));
   return pending.get(scope)!;
 }

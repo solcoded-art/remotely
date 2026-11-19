@@ -3,8 +3,9 @@ import { Capacitor } from '@capacitor/core';
 import { Check, Copy, Download, Laptop, Loader2, RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import release from '../../release.config.json';
+import { PRODUCTION_SERVICE } from '../../shared/account-service.mjs';
 
-const production = 'https://remotely-marisol-workspace-k1zb.ongale.dev';
+const production = PRODUCTION_SERVICE;
 function setupOrigin() { return Capacitor.isNativePlatform() ? production : window.location.origin; }
 
 export function MacSetupInstructions({ compact = false }: { compact?: boolean }) {

@@ -1,4 +1,5 @@
 import * as trust from '../../shared/trust.mjs';
+import { sameService } from '../../shared/account-service.mjs';
 import { deviceIdentity, type Identity, type Pin } from './identity';
 import { request } from './api';
 import type { Auth, Command, Device, DriverEvent, RunningApp, ServerMessage, Signal } from './types';
@@ -182,7 +183,7 @@ export class Connection {
       if (this.desktop || !this.value.ready) throw Error('Sign in on your phone first.');
       const url = new URL(link.trim());
       const payload = JSON.parse(new TextDecoder().decode(trust.unb64(url.hash.slice(6))));
-      if (!url.hash.startsWith('#pair=') || url.origin !== this.auth.service || url.pathname !== '/' || url.search || url.username || url.password || payload.v !== 1 || payload.service !== this.auth.service || payload.userId !== this.auth.user.id || payload.expires <= Date.now() || payload.expires > Date.now() + 180000 || await trust.keyId(payload.key) !== payload.desktopId || trust.unb64(payload.secret).length !== 32) throw Error();
+      if (!url.hash.startsWith('#pair=') || !sameService(url.origin, this.auth.service) || url.pathname !== '/' || url.search || url.username || url.password || payload.v !== 1 || !sameService(payload.service, this.auth.service) || payload.userId !== this.auth.user.id || payload.expires <= Date.now() || payload.expires > Date.now() + 180000 || await trust.keyId(payload.key) !== payload.desktopId || trust.unb64(payload.secret).length !== 32) throw Error();
       const requestId = crypto.randomUUID();
       this.pairCandidate = { inviteId: payload.id, requestId, desktopId: payload.desktopId, key: trust.publicKey(payload.key), expires: payload.expires };
       this.send({ type: 'pair-request', requestId, inviteId: payload.id, proof: await trust.proof(payload.secret, trust.pairing(payload.id, requestId, this.auth.user.id, payload.desktopId, this.deviceId, this.identity.publicKey)) });

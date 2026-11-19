@@ -17,7 +17,7 @@ async function main() {
     await page.evaluate(() => document.fonts.ready);
     assert.equal(await page.evaluate(() => [...document.fonts].some(font => font.family === 'Geist Variable' && font.status === 'loaded')), true);
     await page.getByRole('button', { name: 'Advanced connection settings' }).click();
-    assert.equal(await page.getByLabel('Account server URL').inputValue(), 'https://remotely-marisol-workspace-k1zb.ongale.dev');
+    assert.equal(await page.getByLabel('Account server URL').inputValue(), 'https://enftify.com');
     const denied = await page.evaluate(async () => { try { await window.macRemote.command('unapproved-session', { action: 'type', text: 'must not type' }); return false; } catch { return true; } });
     assert.equal(denied, true);
     console.log('Packaged launch, helper, renderer isolation, bundled font, server default, and approval boundary passed.');

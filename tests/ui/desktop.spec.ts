@@ -118,3 +118,32 @@ test('Mac app prompts for newer releases, opens only the download page, and bloc
     expect(await app.evaluate(() => (globalThis as any).notified)).toBe(1);
   } finally { await app.close(); }
 });
+
+test('upgrading from the old Ongale address moves the Mac app to enftify.com and keeps its device key', async () => {
+  test.skip(process.platform !== 'darwin', 'The native Mac companion requires macOS.');
+  const fs = await import('node:fs/promises'); const os = await import('node:os');
+  const OLD = 'https://remotely-marisol-workspace-k1zb.ongale.dev';
+  const profile = await fs.mkdtemp(path.join(os.tmpdir(), 'remotely-desktop-domain-'));
+  const launch = () => electron.launch({ ...(process.env.MAC_APP_EXECUTABLE ? { executablePath: process.env.MAC_APP_EXECUTABLE, args: ['--user-data-dir=' + profile] } : { args: [path.resolve('.'), '--user-data-dir=' + profile] }), env: { ...process.env, ELECTRON_RUN_AS_NODE: undefined } as unknown as Record<string, string> });
+  const offline = async (app: Awaited<ReturnType<typeof launch>>) => {
+    await app.context().route('**/api/**', route => route.fulfill({ json: { magicLink: true, available: false } }));
+  };
+  const scope = JSON.stringify([OLD, 'domain-move-user']);
+
+  // Simulate a 0.3.2 install: it saved the old address and created a device key under it.
+  let app = await launch(); await offline(app);
+  let page = await app.firstWindow();
+  await expect(page.getByRole('heading', { name: 'Welcome back' })).toBeVisible();
+  const before = await page.evaluate(async scope => { localStorage.setItem('macremote.server', 'https://remotely-marisol-workspace-k1zb.ongale.dev'); return JSON.stringify(await (window as any).macRemote.identity(scope)); }, scope);
+  await app.close();
+
+  // After the update, the app talks to enftify.com but finds the same device key.
+  app = await launch(); await offline(app);
+  try {
+    page = await app.firstWindow();
+    await page.getByRole('button', { name: 'Advanced connection settings' }).click();
+    await expect(page.getByLabel('Account server URL')).toHaveValue('https://enftify.com');
+    const after = await page.evaluate(async scope => JSON.stringify(await (window as any).macRemote.identity(scope)), scope);
+    expect(after).toBe(before);
+  } finally { await app.close(); }
+});

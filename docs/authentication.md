@@ -42,7 +42,9 @@ This is a forward-only authentication cutover: password-only installed clients a
 
 1. In Ongale's domain page for **enftify.com**, enable **Send from your domain** and wait for the platform's sender/DNS verification. Confirm Remotely receives the variable names `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASSWORD`, `SMTP_FROM_DOMAIN`. Keep their values in Ongale.
 2. Set `SMTP_FROM_ADDRESS=support@enftify.com`. Its domain must equal the platform's `SMTP_FROM_DOMAIN`. The default sender, if omitted, is `no-reply@SMTP_FROM_DOMAIN`.
-3. Set `PUBLIC_URL` to the actual HTTPS web-app origin, currently configured by the operator. For the existing host this is `https://remotely-marisol-workspace-k1zb.ongale.dev`. An email domain does not automatically become the web app's origin.
+3. Set `PUBLIC_URL` to the actual HTTPS web-app origin, currently configured by the operator. Production uses `https://enftify.com`. An email domain does not automatically become the web app's origin.
+
+The Mac and iOS apps default to `https://enftify.com` from 0.3.3. Earlier native releases used `https://remotely-marisol-workspace-k1zb.ongale.dev`, which still serves the same service. `shared/account-service.mjs` treats the two as one service: native apps upgrade a saved old address to `enftify.com`, accept sign-in and pairing links from either address, and keep storing sign-ins and device keys under the original key, so updating neither signs users out nor requires re-pairing. The web app always uses the domain the page is served from, because its session cookie belongs to that domain.
 4. Generate a high-entropy secret on your own machine, for example with `openssl rand -base64 32`, and save it as the **Secret** variable `BETTER_AUTH_SECRET` in Ongale. Do not paste the generated value into chat, Git or logs.
 5. Publish compatible native clients and configure the secret, public origin and outbound mail before the password-retirement cutover. Email links are the only sign-in mode; no mode switch is required. Deploy the code, then verify actual mailbox delivery, request/confirm/replay/expiry, refresh, logout and paired-device consent on real devices.
 
