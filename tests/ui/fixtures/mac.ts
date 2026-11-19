@@ -2,6 +2,7 @@ import type { BrowserContext } from '@playwright/test';
 
 export async function installMacFixture(context: BrowserContext, overrides: { permissions?: { accessibility: boolean; screen: string }; driverReady?: boolean; captureError?: string } = {}) {
   await context.addInitScript((overrides) => {
+    localStorage.setItem('macremote.server', 'http://127.0.0.1:3000');
     const fixture = { permissions: { accessibility: true, screen: 'granted' }, driverReady: true, ...overrides };
     (window as any).macTest = fixture;
     const listeners = new Set<(value: unknown) => void>();

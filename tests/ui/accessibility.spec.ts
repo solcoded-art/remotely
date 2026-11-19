@@ -6,6 +6,7 @@ import { login } from './fixtures/account';
 test('login and documentation reflow with enlarged text and expose keyboard navigation', async ({ page }) => {
   await page.setViewportSize({ width: 320, height: 568 });
   await page.goto('/');
+  await expect(page.getByLabel('Email address')).toBeVisible();
   await page.keyboard.press('Tab');
   await expect(page.getByRole('link', { name: 'Skip to main content' })).toBeFocused();
   await page.keyboard.press('Enter');
@@ -70,4 +71,38 @@ test('an older account server shows upgrade guidance before creating any device 
   await expect(page.getByRole('button', { name: 'Retry connection' })).toBeVisible();
   expect(await page.evaluate(async () => (await indexedDB.databases()).some(db => db.name === 'remotely-trusted-devices'))).toBe(false);
   await expectAccessible(page);
+});
+
+
+test('refresh restores an HttpOnly login and sign-out stays signed out', async ({ page, context }) => {
+  await login(page, `remember-${Date.now()}@example.com`, true);
+  expect((await context.cookies()).some(cookie => cookie.name === 'remotely-session' && cookie.httpOnly && cookie.sameSite === 'Lax')).toBe(true);
+  expect(await page.evaluate(() => Object.keys(localStorage).filter(key => /token|password|session/i.test(key)))).toEqual([]);
+  await page.reload(); await expect(page.getByText('Signed in', { exact: true })).toBeVisible();
+  await page.getByRole('button', { name: 'Account settings' }).click(); await page.getByRole('button', { name: 'Sign out', exact: true }).click();
+  await expect(page.getByRole('heading', { name: 'Welcome back' })).toBeVisible();
+  await page.reload(); await expect(page.getByLabel('Email address')).toBeVisible();
+  await expect(page.getByLabel('Password', { exact: true })).toHaveValue(''); await expectAccessible(page);
+});
+
+test('email-link confirmation removes the URL token and waits for explicit consent', async ({ page }) => {
+  const token = 'syntheticMagicLinkTokenForUITestOnly'; let verifies = 0;
+  await page.route('**/api/auth/verify-link', route => { verifies++; return route.fulfill({ status: 400, json: { error: 'This sign-in link is invalid or expired. Request a new one.' } }); });
+  await page.goto('/#sign-in=' + token);
+  await expect(page.getByRole('button', { name: 'Continue with email link' })).toBeVisible();
+  expect(new URL(page.url()).hash).toBe(''); expect(verifies).toBe(0);
+  await expectAccessible(page);
+  await page.getByLabel('Email address').fill('email-test@example.com');
+  await page.getByRole('button', { name: 'Continue with email link' }).click(); await expect(page.getByRole('alert')).toContainText('invalid or expired'); expect(verifies).toBe(1);
+  await page.getByRole('button', { name: 'Back to sign in' }).click(); await expect(page.getByLabel('Email address')).toBeVisible();
+});
+
+test('email-link request journey is accessible and does not claim account existence', async ({ page }) => {
+  await page.route('**/api/auth/config', route => route.fulfill({ json: { magicLink: true } }));
+  await page.route('**/api/auth/magic-link', route => route.fulfill({ json: { status: 'ok' } }));
+  await page.setViewportSize({ width: 320, height: 568 }); await page.goto('/');
+  await page.getByRole('button', { name: 'Email me a sign-in link' }).click(); await page.getByLabel('Email address').fill('email-test@example.com');
+  await page.getByRole('button', { name: 'Send sign-in link' }).click(); await expect(page.getByRole('status')).toContainText('If this email is eligible');
+  await expectAccessible(page); expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1)).toBe(true);
+  await page.screenshot({ path: 'artifacts/magic-link-request-320.png', fullPage: true });
 });

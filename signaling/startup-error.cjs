@@ -1,5 +1,7 @@
 // Use fixed messages: driver errors can include connection strings or passwords.
 const messages = {
+  AUTH_SECRET_INVALID: 'BETTER_AUTH_SECRET must be a high-entropy secret of at least 32 characters.',
+  SMTP_FROM_INVALID: 'SMTP_FROM_ADDRESS must be an address at SMTP_FROM_DOMAIN.',
   DATABASE_URL_MISSING: 'DATABASE_URL is missing. Copy .env.example to .env and start with npm start.',
   DATABASE_URL_INVALID: 'DATABASE_URL must be a valid PostgreSQL connection URL. Check .env.',
   PUBLIC_URL_INVALID: 'PUBLIC_URL must be a valid HTTP or HTTPS origin, or be left unset for local development.',

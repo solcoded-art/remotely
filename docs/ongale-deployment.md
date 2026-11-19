@@ -7,7 +7,7 @@ Status: prepared locally; no Ongale app, database, GitHub repository, domain, or
 | Component | Runs on | Deployment artifact |
 | --- | --- | --- |
 | Account API, device discovery, WebRTC signaling, browser interface | Ongale web process | Root `Dockerfile` |
-| Accounts, hashed passwords, hashed sessions, paired devices | Ongale PostgreSQL | Bind to get `DATABASE_URL` |
+| Accounts, hashed passwords, login sessions, paired devices | Ongale PostgreSQL | Bind to get `DATABASE_URL` |
 | Full-display capture and approved native input | User's Mac | Electron `.app` / DMG |
 | Remote video and controls | iPhone / iPad | Capacitor Xcode project → TestFlight |
 | Optional STUN/TURN relay | Dedicated relay service | External to Ongale's HTTP app |
@@ -39,6 +39,8 @@ Use Ongale's injected `DATABASE_URL` exactly as provided. Do not add a password,
 | `PORT` | Injected application port | Default 3000 |
 | `HOST` | Listen address | Default `0.0.0.0` |
 | `PUBLIC_URL` | Actual HTTPS app origin, including an attached custom domain; adds an explicitly trusted browser origin when the proxy rewrites Host | Optional when Host is preserved |
+| `BETTER_AUTH_SECRET` | High-entropy auth secret, marked Secret; see authentication rollout | With Better Auth |
+| `SMTP_*` | Ongale outbound sender settings; optional `SMTP_FROM_ADDRESS=support@enftify.com` | With magic links |
 | `ALLOW_REGISTRATION` | Set to `false` after creating beta accounts if registration should close | Default true |
 | `ALLOWED_ORIGINS` | Optional comma-separated replacement for browser/native origin defaults | Optional |
 | `STUN_URL` | Your relay provider's STUN URL | Recommended across networks |
@@ -65,8 +67,8 @@ Use the same idempotency key when retrying platform changes. Preserve the Ongale
 ## Operating limits
 
 - Deploy one process. Accounts and devices persist in PostgreSQL; presence, rate-limit buckets, and active WebRTC negotiation state are in memory. A redeploy disconnects sessions and requires fresh Mac approval. Horizontal scaling requires shared signaling/pubsub and distributed limits.
-- Tokens expire after 24 hours and are held only in client memory for this beta. Closing an app requires signing in again. Add Keychain-backed session persistence before a broader rollout.
-- Email/password accounts work, but email verification, password recovery, and MFA are not implemented. The installed `ongale-email` skill defines the platform's `SMTP_*` contract for that follow-up; no outgoing email has been configured or sent.
+- New clients request sessions of up to 30 days with persistent browser cookies or native OS-protected storage. Old clients keep the one-day lifetime. See [authentication](authentication.md) for compatibility and rollout requirements.
+- Better Auth magic links verify inbox access when the secret, public origin and SMTP settings are configured. Password signup remains unverified for legacy compatibility. Password-reset and MFA flows remain outstanding. Configure outbound sending separately from an inbox; development tests use a fake mailer.
 - Native iPhone video playback, macOS Accessibility/Screen Recording grants, multi-monitor selection, NAT traversal, and mobile carrier networks still require physical-device validation.
 - This directory includes all eight official skills with a source/hash manifest. Storage, media, email, and repair skills are available for later use; copying them is not evidence that those services are enabled.
 

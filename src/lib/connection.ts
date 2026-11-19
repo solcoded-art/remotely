@@ -65,7 +65,13 @@ export class Connection {
       this.update({ pins: await this.identity.pins() });
       if (this.disposed) return;
       if (this.desktop) this.removeDriver = window.macRemote!.onDriver(event => this.driverEvent(event));
-      this.authTimer = setTimeout(() => { this.update({ error: 'Your login expired. Sign in again.' }); this.dispose(); }, Math.max(0, this.auth.expires - Date.now()));
+      // Browsers clamp delays above ~24.8 days to 1 ms; schedule long sessions in chunks.
+      const checkExpiry = () => {
+        const remaining = this.auth.expires - Date.now();
+        if (remaining <= 0) { this.update({ error: 'Your login expired. Sign in again.' }); this.dispose(); return; }
+        this.authTimer = setTimeout(checkExpiry, Math.min(remaining, 2147483647));
+      };
+      checkExpiry();
       this.openSocket();
     } catch (error) { this.update({ status: 'offline' }); this.report(error); }
   }

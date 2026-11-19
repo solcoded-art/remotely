@@ -1,6 +1,7 @@
 const { contextBridge, ipcRenderer } = require('electron');
 contextBridge.exposeInMainWorld('macRemote', {
   platform: 'mac',
+  authSession: (service, value) => ipcRenderer.invoke('remote:auth-session', service, value),
   identity: scope => ipcRenderer.invoke('remote:identity', scope),
   sign: (scope, message) => ipcRenderer.invoke('remote:sign', scope, message),
   pins: scope => ipcRenderer.invoke('remote:pins', scope),

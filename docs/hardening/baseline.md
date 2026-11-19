@@ -44,3 +44,10 @@ The requested OWASP skill requires exploit-validated findings and honest categor
 The requested Snyk workflow requires an authenticated Snyk MCP connection, which is not available in this session. npm audit is a supplemental advisory baseline, not a substitute for Snyk SAST/SCA or a completed remediation run. Present concrete issue/fix plans, evaluate breaking-change risk and re-scan each fix. Keep security fixes separate from unrelated refactors.
 
 Release only after identified Critical/High findings are resolved or explicitly risk-accepted, critical journey tests pass on real supported devices, signing and download provenance are verified, operational recovery is demonstrated, and accessibility claims match documented manual evidence. Track every open exception with an owner and review date.
+
+
+## Authentication follow-up, 2026-11-19
+
+The local authentication candidate partially addresses SEC-01/SEC-02: persistent HttpOnly browser sessions, native OS-protected login-token storage, Better Auth magic links, disposable-domain checks, reliable server logout and immediate local disconnection during logout failure. Local evidence and platform limits are in [validation](validation.md); rollout gates and first-verification behavior are in [authentication](../authentication.md).
+
+Password signup remains unverified for legacy-client compatibility. Password reset, MFA/passkeys, login-session administration/logout-all, distributed throttling/proxy validation, production delivery monitoring and physical-device testing remain open. Domain-list matches do not prove malicious intent. This follow-up does not establish complete security or accessibility compliance.

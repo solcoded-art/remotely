@@ -27,7 +27,7 @@ async function main() {
     }
     if (!ready) throw Error('Test database did not start.');
     phase = 'start application image';
-    docker(['run', '-d', '--rm', '--name', service, '--network', network, '-p', '127.0.0.1::3000', '-e', `DATABASE_URL=postgresql://postgres@${database}:5432/remote_test`, 'ios-remote-ongale:local']);
+    docker(['run', '-d', '--rm', '--name', service, '--network', network, '-p', '127.0.0.1::3000', '-e', `DATABASE_URL=postgresql://postgres@${database}:5432/remote_test`, '-e', `BETTER_AUTH_SECRET=${randomUUID()}${randomUUID()}`, '-e', 'PUBLIC_URL=http://127.0.0.1:3000', 'ios-remote-ongale:local']);
     const address = () => `http://127.0.0.1:${docker(['port', service, '3000/tcp']).split(':').pop()}`;
     let url = address();
     const healthy = async () => {

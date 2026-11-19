@@ -34,14 +34,28 @@ async function createStore(connectionString) {
     } catch (error) { await client.query('ROLLBACK'); throw error; }
     finally { client.release(); }
   } catch (error) { await pool.end(); throw error; }
+  async function importLegacyAccount(email) {
+    // A previous release may register an account while a candidate is starting.
+    // Mark the row atomically, so email verification cannot resurrect an old password.
+    await pool.query(`WITH promoted AS (UPDATE remote_users SET auth_migrated = TRUE
+      WHERE email = $1 AND NOT auth_migrated AND salt IS NOT NULL AND hash IS NOT NULL RETURNING id, salt, hash)
+      INSERT INTO remote_auth_accounts (id, account_id, provider_id, user_id, password)
+      SELECT id, id, 'credential', id, 'legacy$' || salt || '$' || hash FROM promoted
+      ON CONFLICT (provider_id, account_id) DO NOTHING`, [email]);
+  }
   const dummySalt = randomBytes(16).toString('hex');
   const dummyHash = randomBytes(64).toString('hex');
   return {
+    pool, importLegacyAccount,
     async register(email, password) {
       const id = randomUUID();
       const salt = randomBytes(16).toString('hex');
       const hash = await passwordHash(password, salt);
-      try { await pool.query('INSERT INTO remote_users (id, email, salt, hash) VALUES ($1, $2, $3, $4)', [id, email, salt, hash]); }
+      try {
+        await pool.query(`WITH added AS (INSERT INTO remote_users (id, email, salt, hash, auth_migrated) VALUES ($1, $2, $4, $5, TRUE) RETURNING id)
+          INSERT INTO remote_auth_accounts (id, account_id, provider_id, user_id, password)
+          SELECT id, id, 'credential', id, $3 FROM added`, [id, email, `legacy$${salt}$${hash}`, salt, hash]);
+      }
       catch (error) {
         if (error.code === '23505') throw Object.assign(new Error('Unable to create this account. Try signing in.'), { status: 409 });
         throw error;
@@ -49,23 +63,49 @@ async function createStore(connectionString) {
       return { id, email };
     },
     async login(email, password) {
-      const user = (await pool.query('SELECT * FROM remote_users WHERE email = $1', [email])).rows[0];
-      const actual = await passwordHash(password, user?.salt || dummySalt);
-      const matches = timingSafeEqual(Buffer.from(actual, 'hex'), Buffer.from(user?.hash || dummyHash, 'hex'));
+      await importLegacyAccount(email);
+      const user = (await pool.query(`SELECT u.id, u.email, a.password FROM remote_users u
+        LEFT JOIN remote_auth_accounts a ON a.user_id = u.id AND a.provider_id = 'credential' WHERE u.email = $1`, [email])).rows[0];
+      const saved = user?.password;
+      let matches = false;
+      if (!saved || saved.startsWith('legacy$')) {
+        const [, salt, hash] = (saved || '').split('$');
+        const actual = await passwordHash(password, salt || dummySalt);
+        matches = timingSafeEqual(Buffer.from(actual, 'hex'), Buffer.from(hash || dummyHash, 'hex'));
+      } else {
+        const { verifyPassword } = await import('better-auth/crypto');
+        matches = await verifyPassword({ password, hash: saved });
+      }
       return user && matches ? { id: user.id, email: user.email } : null;
     },
-    async issue(userId) {
+    async issue(userId, remember = false) {
       await pool.query('DELETE FROM remote_sessions WHERE expires <= $1', [Date.now()]);
       const token = randomBytes(32).toString('base64url');
-      const expires = Date.now() + 24 * 60 * 60 * 1000;
+      const expires = Date.now() + (remember ? 30 : 1) * 24 * 60 * 60 * 1000;
       await pool.query('INSERT INTO remote_sessions (hash, user_id, expires) VALUES ($1, $2, $3)', [digest(token), userId, expires]);
       return { token, expires };
     },
     async authenticate(token) {
       if (typeof token !== 'string' || token.length > 128) return null;
-      return (await pool.query('SELECT u.id, u.email FROM remote_sessions s JOIN remote_users u ON u.id = s.user_id WHERE s.hash = $1 AND s.expires > $2', [digest(token), Date.now()])).rows[0] || null;
+      return (await pool.query(`SELECT u.id, u.email FROM remote_sessions s JOIN remote_users u ON u.id = s.user_id WHERE s.hash = $1 AND s.expires > $2
+        UNION ALL SELECT u.id, u.email FROM remote_auth_sessions s JOIN remote_users u ON u.id = s.user_id WHERE s.token = $3 AND s.expires_at > NOW() LIMIT 1`, [digest(token), Date.now(), token])).rows[0] || null;
     },
-    async revoke(token) { await pool.query('DELETE FROM remote_sessions WHERE hash = $1', [digest(token)]); },
+    async revoke(token) {
+      await pool.query('DELETE FROM remote_sessions WHERE hash = $1', [digest(token)]);
+      await pool.query('DELETE FROM remote_auth_sessions WHERE token = $1', [token]);
+    },
+    async session(token) {
+      if (typeof token !== 'string' || token.length > 128) return null;
+      const user = await this.authenticate(token);
+      if (!user) return null;
+      const result = await pool.query(`SELECT expires FROM remote_sessions WHERE hash = $1
+        UNION ALL SELECT (EXTRACT(EPOCH FROM expires_at) * 1000)::BIGINT FROM remote_auth_sessions WHERE token = $2 LIMIT 1`, [digest(token), token]);
+      return { user, token, expires: Number(result.rows[0].expires) };
+    },
+    async freshSession(token) {
+      return !!(await pool.query(`SELECT 1 FROM remote_auth_sessions WHERE token = $1 AND created_at > NOW() - INTERVAL '5 minutes' AND expires_at > NOW()`, [token])).rowCount;
+    },
+    async hasPassword(id) { return !!(await pool.query("SELECT 1 FROM remote_auth_accounts WHERE user_id = $1 AND provider_id = 'credential' AND password IS NOT NULL", [id])).rowCount; },
     async deleteUser(id) { await pool.query('DELETE FROM remote_users WHERE id = $1', [id]); },
     async registerDevice(id, userId, name, kind, publicKey) {
       const result = await pool.query(`INSERT INTO remote_devices (id, user_id, name, kind, public_key) VALUES ($1, $2, $3, $4, $5)
@@ -87,4 +127,4 @@ async function createStore(connectionString) {
     async close() { await pool.end(); },
   };
 }
-module.exports = { createStore };
+module.exports = { createStore, passwordHash };

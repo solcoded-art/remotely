@@ -30,7 +30,10 @@ async function main() {
     if (!ready) throw Error('Disposable PostgreSQL did not become ready.');
     console.log('Testing against disposable PostgreSQL.');
     const args = process.argv.slice(2);
-    const child = spawn(args[0], args.slice(1), { stdio: 'inherit', env: { ...process.env, DATABASE_URL: url, TEST_DATABASE_URL: url, HOST: '127.0.0.1' } });
+    const testEnv = { ...process.env, DATABASE_URL: url, TEST_DATABASE_URL: url, HOST: '127.0.0.1' };
+    // Tests use injected mail fakes; never inherit a production sender or auth secret.
+    for (const key of Object.keys(testEnv)) if (key.startsWith('SMTP_') || ['BETTER_AUTH_SECRET', 'PUBLIC_URL'].includes(key)) delete testEnv[key];
+    const child = spawn(args[0], args.slice(1), { stdio: 'inherit', env: testEnv });
     const code = await new Promise((resolve, reject) => { child.once('error', reject); child.once('exit', value => resolve(value ?? 1)); });
     process.exitCode = code;
   } finally { cleanup(); }

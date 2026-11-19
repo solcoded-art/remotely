@@ -154,6 +154,17 @@ test('real login and WebRTC connection with a synthetic desktop capture', async 
   await expect.poll(() => desktop.evaluate(() => (window as any).commands.some((value: any) => value.action === 'drag' && value.dx === 20))).toBe(true);
   await phone.getByRole('tab', { name: 'Apps', exact: true }).click();
   await expect.poll(() => desktop.evaluate(() => (window as any).commands.some((value: any) => value.action === 'up'))).toBe(true);
+  // A failed server logout must still stop local screen sharing and control immediately.
+  await phone.route('**/api/auth/logout', route => route.abort('failed'));
+  await phone.getByRole('button', { name: 'Account settings', exact: true }).click();
+  await phone.getByRole('button', { name: 'Sign out', exact: true }).click();
+  await expect(phone.getByRole('alert').filter({ hasText: 'Sign-out could not finish' })).toBeVisible();
+  await expect(desktop.getByText('Session active', { exact: true })).not.toBeVisible();
+  await expect(phone.locator('video')).toHaveCount(0);
+  await phone.unroute('**/api/auth/logout');
+  await phone.getByRole('button', { name: 'Connect to Test Mac', exact: true }).click();
+  await desktop.getByRole('button', { name: 'Allow connection', exact: true }).click();
+  await expect(phone.getByText('Session connected', { exact: true })).toBeVisible();
   await desktop.getByRole('button', { name: 'Revoke My iPhone', exact: true }).click();
   await expectAccessible(desktop);
   await desktop.getByRole('button', { name: 'Revoke device', exact: true }).click();
@@ -163,7 +174,7 @@ test('real login and WebRTC connection with a synthetic desktop capture', async 
   await expect(phone.getByRole('button', { name: 'Connect to Test Mac', exact: true })).toBeDisabled();
   await phone.getByLabel('Pairing link from your Mac').fill(link);
   await phone.getByRole('button', { name: 'Request pairing', exact: true }).click();
-  await expect(phone.getByRole('alert')).toContainText('expired');
+  await expect(phone.getByRole('alert').filter({ hasText: 'expired' })).toBeVisible();
   await desktopContext.close(); await phoneContext.close();
 });
 
@@ -248,8 +259,9 @@ test('a wrong pairing secret and a signaling relay that changes the Mac certific
     await phone.getByLabel('Pairing link from your Mac').fill(original); await phone.getByRole('button', { name: 'Request pairing', exact: true }).click();
     await desktop.getByRole('button', { name: 'Allow pairing', exact: true }).click();
     await expect(phone.getByRole('button', { name: 'Connect to Test Mac', exact: true })).toBeEnabled();
-    // A reload loses the login token, but preserves the non-extractable key and approved Mac pin.
-    await login(phone, email);
+    // Reload restores the login session as well as the device key and approved Mac pin.
+    await phone.reload();
+    await expect(phone.getByText('Signed in', { exact: true })).toBeVisible();
     await expect(phone.getByRole('button', { name: 'Connect to Test Mac', exact: true })).toBeEnabled();
     await desktop.getByRole('button', { name: 'Choose display', exact: true }).click(); await desktop.getByRole('button', { name: 'Main display', exact: true }).click();
     await phone.getByRole('button', { name: 'Connect to Test Mac', exact: true }).click();

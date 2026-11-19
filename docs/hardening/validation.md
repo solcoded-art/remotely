@@ -73,3 +73,20 @@ Date: 2026-11-19. These web UI changes use the existing 0.3.1 Mac command protoc
 - Browser captures and driver commands remain synthetic/mocked. Physical iPhone keyboard/IME, actual native text insertion and OS/browser fullscreen behavior still require manual device validation. Automated accessibility checks do not establish complete WCAG or ADA compliance.
 
 Live typing is opt-in. Pending browser input is bounded and discarded when video/control access stops; commands already accepted by the Mac cannot be recalled. The screen and app-switch controls wait for queued browser keyboard input to drain. Phone-view fullscreen and the active Mac app's fullscreen shortcut are separate controls.
+
+
+## Persistent login and Better Auth email links
+
+Date: 2026-11-19. Local candidate validation before commit/deployment. Native installers and production mail activation are separate release steps; magic links default off behind `MAGIC_LINK_ENABLED`.
+
+| Check | Result and scope |
+| --- | --- |
+| `npm test` | All 29 passed against disposable PostgreSQL. Includes cookie restoration across service restart, hostile origins, server revocation, hashed/expired/single-use concurrent magic links, recipient matching, unproven-password/session cleanup without deleting device records, original-schema and rolling password migration, recent email proof for deletion, domain-risk flags, rollout gating, missing SMTP and mailer failures. |
+| `npm run test:ui` | All 15 passed on macOS. Includes real browser refresh/logout persistence, recipient-confirmation UI without GET consumption, selected axe/reflow checks at 320 pixels, full two-peer synthetic WebRTC, and immediate local disconnection during a failed server logout. |
+| Native shell | Actual Electron app used a verified disposable profile, OS-encrypted session save/restore on renderer reload, successful sign-out and a further reload that stayed signed out. No personal credential profile or screen/input permissions were used for this test. The separate vault unit test injects a fake encryption provider. |
+| `npm run ios:sync` | Passed TypeScript/Vite build and sync of `@aparajita/capacitor-secure-storage` 8.0.1. No Xcode compilation, physical iPhone Keychain test or TestFlight release. |
+| `npm run test:image` | Passed clean production Docker rendering/health/API/migration/persistence smoke with Better Auth configured and email links disabled. Uses disposable PostgreSQL and an ephemeral test secret. |
+| Dependency audit | Production `npm audit --omit=dev`: zero advisories. The install still reports the existing six moderate build dependency entries. This is not Snyk, SAST or a penetration test. |
+| Source hygiene | `git diff --check` passed. The managed Ongale workflow is unchanged. No SMTP values, auth secrets, login credentials, generated profiles or artifacts are committed. |
+
+No real outbound mail was sent. Ongale's domain sending/SMTP bindings, actual mailbox delivery, compatible Mac installer publication, physical iOS behavior and independent security/accessibility review remain unverified. The first inbox proof for an unverified account removes the unproven password and signs out other devices; existing user and pairing identities remain. See [authentication](../authentication.md) for migration and rollout details.

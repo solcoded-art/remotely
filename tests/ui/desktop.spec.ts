@@ -3,8 +3,12 @@ import path from 'node:path';
 
 test('native desktop shell boots with isolated renderer and authenticated API access', async () => {
   test.skip(process.platform !== 'darwin', 'The native Mac companion requires macOS.');
-  const app = await electron.launch({ ...(process.env.MAC_APP_EXECUTABLE ? { executablePath: process.env.MAC_APP_EXECUTABLE, args: [] } : { args: [path.resolve('.')] }), env: { ...process.env, ELECTRON_RUN_AS_NODE: undefined } as unknown as Record<string, string> });
+  const fs = await import('node:fs/promises'); const os = await import('node:os');
+  const profile = await fs.mkdtemp(path.join(os.tmpdir(), 'remotely-desktop-auth-'));
+  const profileArg = '--user-data-dir=' + profile;
+  const app = await electron.launch({ ...(process.env.MAC_APP_EXECUTABLE ? { executablePath: process.env.MAC_APP_EXECUTABLE, args: [profileArg] } : { args: [path.resolve('.'), profileArg] }), env: { ...process.env, ELECTRON_RUN_AS_NODE: undefined } as unknown as Record<string, string> });
   try {
+    expect(await fs.realpath(await app.evaluate(({ app }) => app.getPath('userData')))).toBe(await fs.realpath(profile));
     const page = await app.firstWindow();
     await expect(page.getByText('Mac app', { exact: true })).toBeVisible();
     expect(await page.evaluate(() => typeof (window as any).require)).toBe('undefined');
@@ -22,8 +26,13 @@ test('native desktop shell boots with isolated renderer and authenticated API ac
       catch { return true; }
     });
     expect(denied).toBe(true);
-    await page.screenshot({ path: 'artifacts/desktop-companion.png', fullPage: true });
-  } finally { await app.close(); }
+    await page.reload();
+    await expect(page.getByText('Signed in', { exact: true })).toBeVisible({ timeout: 10000 });
+    await page.getByRole('button', { name: 'Account settings' }).click(); await page.getByRole('button', { name: 'Sign out', exact: true }).click();
+    await expect(page.getByLabel('Email address')).toBeVisible();
+    await page.reload(); await expect(page.getByLabel('Email address')).toBeVisible();
+    await page.screenshot({ path: 'artifacts/desktop-auth-logout.png', fullPage: true });
+  } finally { await app.close(); await fs.rm(profile, { recursive: true, force: true }); }
 });
 
 test('native capture policy accepts Electron origin serialization without capturing the physical screen', async () => {

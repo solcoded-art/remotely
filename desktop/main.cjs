@@ -1,5 +1,6 @@
 const { createDisplayCaptureHandler } = require('./display-capture.cjs');
 const { safeStorage } = require('electron');
+const { createAuthSessionStore } = require('./auth-session.cjs');
 const { createIdentityStore } = require('./identity.cjs');
 const { app, BrowserWindow, ipcMain, protocol, net, session, desktopCapturer, systemPreferences } = require('electron');
 const { spawn } = require('node:child_process');
@@ -31,6 +32,8 @@ function localOnly(event) {
 function handle(name, fn) { ipcMain.handle(`remote:${name}`, (event, ...args) => { localOnly(event); return fn(...args); }); }
 
 app.whenReady().then(async () => {
+  const authSession = createAuthSessionStore(path.join(app.getPath('userData'), 'auth-sessions'), safeStorage);
+  handle('auth-session', authSession);
   const dist = path.resolve(__dirname, '../dist');
   protocol.handle('app', async request => {
     const url = new URL(request.url);

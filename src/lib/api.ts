@@ -12,6 +12,7 @@ export async function request<T>(service: string, route: string, options: { toke
   let response: Response;
   try { response = await fetch(service + route, {
     method: options.method || 'GET',
+    credentials: 'include',
     headers: { ...(options.data ? { 'Content-Type': 'application/json' } : {}), ...(options.token ? { Authorization: `Bearer ${options.token}` } : {}) },
     body: options.data ? JSON.stringify(options.data) : undefined,
     signal: AbortSignal.timeout(15000),
@@ -21,11 +22,11 @@ export async function request<T>(service: string, route: string, options: { toke
   }
   let data;
   try { data = await response.json(); } catch { throw Error('The account server did not return JSON. Check its URL.'); }
-  if (!response.ok) throw Error(data.error || 'The request failed.');
+  if (!response.ok) throw Object.assign(Error(data.error || 'The request failed.'), { status: response.status });
   return data;
 }
 
 export async function signIn(service: string, email: string, password: string, register: boolean) {
-  const result = await request<Omit<Auth, 'service'>>(service, `/api/auth/${register ? 'register' : 'login'}`, { method: 'POST', data: { email, password } });
+  const result = await request<Omit<Auth, 'service'>>(service, `/api/auth/${register ? 'register' : 'login'}`, { method: 'POST', data: { email, password, remember: true } });
   return { ...result, service };
 }

@@ -4,6 +4,7 @@ const path = require('node:path');
 const { randomUUID, createHmac } = require('node:crypto');
 const { WebSocketServer } = require('ws');
 const { createStore } = require('./store.cjs');
+const { createAuthentication, normalizeEmail } = require('./authentication.cjs');
 const { createDownloads } = require('./downloads.cjs');
 
 const defaults = ['capacitor://localhost', 'app://macremote', 'http://localhost', 'http://127.0.0.1:5173', 'http://localhost:5173', 'http://127.0.0.1:3000', 'http://localhost:3000'];
@@ -20,10 +21,10 @@ async function createService(options = {}) {
   const pairEpochs = new Map();
   const pairKey = (desktop, controller) => `${desktop}:${controller}`;
   let publicOrigin = null;
-  if (process.env.PUBLIC_URL) {
+  if (options.publicURL || process.env.PUBLIC_URL) {
     try {
-      const url = new URL(process.env.PUBLIC_URL);
-      if (!['http:', 'https:'].includes(url.protocol) || url.username || url.password || url.search || url.hash || url.pathname !== '/') throw Error();
+      const url = new URL(options.publicURL || process.env.PUBLIC_URL);
+      if (!['http:', 'https:'].includes(url.protocol) || url.protocol === 'http:' && !['localhost', '127.0.0.1', '[::1]'].includes(url.hostname) || url.username || url.password || url.search || url.hash || url.pathname !== '/') throw Error();
       publicOrigin = url.origin;
     } catch { throw Object.assign(new Error('Invalid public origin.'), { code: 'PUBLIC_URL_INVALID' }); }
   }
@@ -31,6 +32,10 @@ async function createService(options = {}) {
   // Packaged clients are first-party origins, even with a browser-origin override.
   const origins = new Set(['app://macremote', 'capacitor://localhost', ...(options.origins || (process.env.ALLOWED_ORIGINS ? process.env.ALLOWED_ORIGINS.split(',').map(value => value.trim()).filter(Boolean) : defaults))]);
   if (publicOrigin) origins.add(publicOrigin);
+  let authentication;
+  try { authentication = await createAuthentication({ store, publicOrigin, origins, secret: options.authSecret,
+    sendMail: options.sendMail, enableMagicLinks: options.enableMagicLinks, allowRegistration: (options.allowRegistration ?? process.env.ALLOW_REGISTRATION) !== 'false' }); }
+  catch (error) { await store.close(); throw error; }
   // Browser module/CSS requests may carry Origin even on the app's own host.
   // Do not rely on a manually configured PUBLIC_URL for same-origin traffic.
   function allowsOrigin(origin, req) {
@@ -101,7 +106,7 @@ async function createService(options = {}) {
     const allowedOrigin = allowsOrigin(origin, req);
     const publicFile = req.method === 'GET' && !req.url.startsWith('/api/') && req.url !== '/ws';
     if (!allowedOrigin && !publicFile) return json(403, { error: 'Origin is not allowed.' });
-    if (origin && allowedOrigin) res.setHeader('Access-Control-Allow-Origin', origin);
+    if (origin && allowedOrigin) { res.setHeader('Access-Control-Allow-Origin', origin); res.setHeader('Access-Control-Allow-Credentials', 'true'); }
     res.setHeader('Access-Control-Allow-Headers', 'Authorization, Content-Type');
     res.setHeader('Access-Control-Allow-Methods', 'GET, POST, DELETE, OPTIONS');
     if (req.method === 'OPTIONS') { res.writeHead(204); return res.end(); }
@@ -127,31 +132,39 @@ async function createService(options = {}) {
       if (['/api/auth/register', '/api/auth/login'].includes(route) && req.method === 'POST') {
         if (limited(`auth:${req.socket.remoteAddress}`, 25, 15 * 60 * 1000)) throw fail(429, 'Too many attempts. Try again in 15 minutes.');
         const data = await readBody(req);
-        const email = typeof data.email === 'string' ? data.email.trim().toLowerCase() : '';
-        if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || email.length > 254 || !text(data.password, 256) || data.password.length < 12) throw fail(400, 'Enter an email and a password of at least 12 characters.');
+        const email = normalizeEmail(data.email);
+        if (!text(data.password, 256) || data.password.length < 12) throw fail(400, 'Enter an email and a password of at least 12 characters.');
         if (limited(`email:${email}`, 10, 15 * 60 * 1000)) throw fail(429, 'Too many attempts. Try again in 15 minutes.');
         if (activeAuth >= 4) throw fail(503, 'Sign-in is busy. Try again shortly.');
         activeAuth++;
-        let user;
         try {
-          if (route.endsWith('register')) {
-            if ((options.allowRegistration ?? process.env.ALLOW_REGISTRATION) === 'false') throw fail(403, 'Registration is disabled.');
-            user = await store.register(email, data.password);
-          } else user = await store.login(email, data.password);
+          const register = route.endsWith('register');
+          if (register && (options.allowRegistration ?? process.env.ALLOW_REGISTRATION) === 'false') throw fail(403, 'Registration is disabled.');
+          return json(200, await authentication.password(email, data.password, register, data.remember === true, req, res));
         } finally { activeAuth--; }
-        if (!user) throw fail(401, 'Email or password is incorrect.');
-        return json(200, { user, ...await store.issue(user.id) });
       }
-      const token = req.headers.authorization?.replace(/^Bearer /, '');
+      if (route === '/api/auth/config' && req.method === 'GET') return json(200, { magicLink: authentication.magicAvailable });
+      if (route === '/api/auth/session' && req.method === 'GET') return json(200, await authentication.restore(req, res));
+      if (['/api/auth/magic-link', '/api/auth/verify-link'].includes(route) && req.method === 'POST') {
+        if (limited(`magic-ip:${req.socket.remoteAddress}`, 20, 15 * 60 * 1000)) throw fail(429, 'Too many email sign-in attempts. Try again in 15 minutes.');
+        const data = await readBody(req);
+        if (route.endsWith('verify-link')) return json(200, await authentication.verify(data.token, normalizeEmail(data.email), req, res));
+        const email = normalizeEmail(data.email);
+        if (limited(`magic-email:${email}`, 3, 15 * 60 * 1000)) throw fail(429, 'Please wait before requesting another sign-in link.');
+        return json(200, await authentication.send(email));
+      }
+      const token = route === '/api/auth/logout' ? authentication.tokenFrom(req) : req.headers.authorization?.replace(/^Bearer /, '');
       const user = await store.authenticate(token);
       if (!user) throw fail(401, 'Sign in to continue.');
       if (route === '/api/auth/logout' && req.method === 'POST') {
-        await store.revoke(token); closeToken(token); return json(200, { status: 'ok' });
+        await store.revoke(token); closeToken(token); authentication.cookie(req, res, null, 0); return json(200, { status: 'ok' });
       }
       if (route === '/api/account' && req.method === 'DELETE') {
         if (limited(`delete:${user.id}`, 5, 15 * 60 * 1000)) throw fail(429, 'Too many attempts. Try again later.');
         const data = await readBody(req);
-        if (!text(data.password, 256) || !(await store.login(user.email, data.password))) throw fail(403, 'Password is incorrect.');
+        if (await store.hasPassword(user.id)) {
+          if (!text(data.password, 256) || !(await store.login(user.email, data.password))) throw fail(403, 'Password is incorrect.');
+        } else if (data.confirmEmail !== user.email || !await store.freshSession(token)) throw fail(403, 'Sign in with a fresh email link, then enter your email to confirm deletion.');
         for (const peer of peers.values()) if (peer.user.id === user.id) peer.ws.close(4001, 'Account deleted');
         await store.deleteUser(user.id); return json(200, { status: 'ok' });
       }

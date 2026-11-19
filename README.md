@@ -1,6 +1,6 @@
 # Mac Remote
 
-A downloadable iOS client and Mac desktop companion, paired through email/password accounts, one-use QR links and approved device keys. The shared React interface uses official shadcn/ui components and adapts to phones, landscape, tablets, and desktop windows.
+A downloadable iOS client and Mac desktop companion, paired through email accounts, one-use QR links and approved device keys. The shared React interface uses official shadcn/ui components and adapts to phones, landscape, tablets, and desktop windows.
 
 The Mac shares a selected display over WebRTC. Video and input use the peer connection; the hosted service handles accounts, device discovery, and signaling. The Mac user approves each session. Direct connections are preferred, with optional TURN relay credentials for difficult networks.
 
@@ -70,6 +70,6 @@ See the [hardening milestone](docs/hardening/README.md), [security/accessibility
 
 ## Current beta limits
 
-Login uses email and a password of at least 12 characters. Client tokens are held in memory, so relaunching requires login. Email verification, password recovery, MFA, unattended access, audio forwarding, background phone sessions, and file transfer are not implemented. One active controller per Mac is supported. Accounts and devices persist in PostgreSQL; live sessions end on server restart.
+Login supports passwords of at least 12 characters and optional Better Auth magic links when SMTP is configured. New clients stay signed in for up to 30 days, using HttpOnly browser cookies or OS-protected native storage. First email verification replaces an existing unverified password and signs out other devices; compatible updated native apps are required for email sign-in. See [authentication setup and migration](docs/authentication.md). Password recovery by reset, MFA, unattended access, audio forwarding, background phone sessions, and file transfer are not implemented. One active controller per Mac is supported. Accounts and devices persist in PostgreSQL; live sessions end on server restart.
 
 The old unauthenticated shell/action server has been removed. Remote commands are allowlisted and run only inside the approved desktop peer. See `docs/distribution.md` for trust and signing limits.
