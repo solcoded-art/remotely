@@ -1,6 +1,6 @@
 # Remote access threat model
 
-Version 1, 2026-11-19. Assumptions require validation; this document does not claim complete threat coverage.
+Version 2, 2026-11-19. Assumptions require validation; this document does not claim complete threat coverage.
 
 ## Assets and trust boundaries
 
@@ -19,7 +19,7 @@ flowchart LR
   N -->|Local approval / selected display| O[macOS capture and permissions]
 ```
 
-The service is trusted for accounts, ownership, discovery and signaling. It must never execute remote input, shell commands or screen capture. WebRTC transport encryption does not by itself prove peer identity independently of signaling. A malicious service or stolen account therefore needs an explicit analysis and a device-bound trust design.
+The service is trusted for accounts, ownership, discovery and signaling. It must never execute remote input, shell commands or screen capture. WebRTC transport encryption does not by itself prove peer identity independently of signaling. Protocol v1 now pins locally approved device keys and verifies signed SDP/ICE before accepting peer descriptions. See [trusted devices](../trusted-devices.md) for the protocol, malicious-signaling/browser-code boundary and recovery limitations.
 
 The Mac renderer is less trusted than Electron main/native helper. Only bundled app content may call IPC, each native command requires local approved-session authority, and received data must be validated at the final privilege boundary. macOS permissions are necessary but do not replace per-session consent.
 
@@ -41,4 +41,4 @@ The Mac renderer is less trusted than Electron main/native helper. Only bundled 
 
 Maintain explicit local approval for every session in the first release. Unattended access is outside this milestone and requires a separate threat model. A connected Mac must expose an immediate End session action. Do not add screen recording, clipboard synchronization, arbitrary remote shell or file transfer without separate consent and review. TURN may observe network metadata; it must not be described as a screen-recording backend.
 
-Resolve whether new-device enrollment requires MFA, what session inactivity/maximum durations apply, how peer device keys are enrolled/recovered, and what events operators retain. These decisions precede account/session implementation, rather than being inferred from a visual redesign.
+Device pairing now requires possession of a one-use Mac invitation and local Mac approval. Account MFA, session inactivity/maximum durations, deliberate lost-key recovery and operator audit retention remain unresolved. These decisions precede account/session implementation, rather than being inferred from a visual redesign.

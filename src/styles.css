@@ -17,7 +17,7 @@
   --color-secondary: #292e34; --color-secondary-foreground: var(--foreground);
   --color-muted: #22262c; --color-muted-foreground: var(--muted-foreground);
   --color-accent: #313840; --color-accent-foreground: var(--foreground);
-  --color-destructive: #ffb3b3; --color-destructive-foreground: #391215;
+  --color-destructive: #ffb3b3; --color-destructive-foreground: #21090c;
   --color-border: var(--border); --color-input: #697580; --color-ring: var(--primary);
   --radius-sm: 8px; --radius-md: 10px; --radius-lg: 14px; --radius-xl: 20px;
 }

@@ -46,3 +46,7 @@ Skipping electron-builder signing left linker-only ad-hoc signatures with no res
 The release verifies bundle/helper signatures, architecture and version, rejects a deliberately modified resource, and launches the packaged app without requesting permissions or performing native input. After ZIP creation, it extracts into a fresh temporary directory and repeats signature and launch checks. Developer ID signing, notarization and clean-Mac browser-download testing remain separate requirements. The legacy `signed: false` metadata indicates no Developer ID signature; `signature: "ad-hoc"` describes the integrity seal.
 
 Replace the old 0.2.2 app with 0.2.3. Do not remove quarantine attributes or disable Gatekeeper for a damaged-app alert. macOS can still refuse the replacement because its publisher is unverified; [Apple documents an app-specific opening flow](https://support.apple.com/en-us/102445) when the source has been verified. Persistent damaged-app warnings require investigation, not a global security bypass.
+
+## Trusted-device protocol release (0.3.0)
+
+The 0.3.0 client/server protocol requires device keys and explicit QR/link pairing. Publish the new Mac ZIP before deploying the matching service; old clients are rejected with an upgrade message. The release target is configured but is not evidence that a public artifact has been published. See [trusted devices](trusted-devices.md) for coordination, key storage, Keychain prompts and recovery limits. Developer ID signing/notarization remain unavailable.

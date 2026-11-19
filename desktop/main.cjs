@@ -1,3 +1,5 @@
+const { safeStorage } = require('electron');
+const { createIdentityStore } = require('./identity.cjs');
 const { app, BrowserWindow, ipcMain, protocol, net, session, desktopCapturer, systemPreferences } = require('electron');
 const { spawn } = require('node:child_process');
 const fs = require('node:fs');
@@ -29,14 +31,18 @@ function handle(name, fn) { ipcMain.handle(`remote:${name}`, (event, ...args) =>
 
 app.whenReady().then(async () => {
   const dist = path.resolve(__dirname, '../dist');
-  protocol.handle('app', request => {
+  protocol.handle('app', async request => {
     const url = new URL(request.url);
     if (url.hostname !== 'macremote') return new Response('Forbidden', { status: 403 });
     let relative;
     try { relative = decodeURIComponent(url.pathname); } catch { return new Response('Invalid path', { status: 400 }); }
     const target = path.resolve(dist, '.' + (relative === '/' ? '/index.html' : relative));
     if (!target.startsWith(dist + path.sep)) return new Response('Forbidden', { status: 403 });
-    return net.fetch(pathToFileURL(target).toString());
+    const response = await net.fetch(pathToFileURL(target).toString());
+    const headers = new Headers(response.headers);
+    headers.set('Content-Security-Policy', "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; media-src 'self' blob:; connect-src 'self' https: wss: http://127.0.0.1:* ws://127.0.0.1:* http://localhost:* ws://localhost:*; frame-ancestors 'none'; frame-src 'none'; base-uri 'none'; object-src 'none'; form-action 'none'");
+    headers.set('X-Content-Type-Options', 'nosniff');
+    return new Response(response.body, { status: response.status, headers });
   });
   const binary = app.isPackaged ? path.join(process.resourcesPath, 'mac_driver') : path.resolve(__dirname, '../bin/mac_driver');
   if (!fs.existsSync(binary)) throw Error('Compile the input driver with npm run build:driver.');
@@ -69,6 +75,11 @@ app.whenReady().then(async () => {
       callback({ video: source });
     } catch { callback({}); }
   });
+  const identities = createIdentityStore(path.join(app.getPath('userData'), 'device-keys'), safeStorage);
+  handle('identity', scope => identities.identity(scope));
+  handle('sign', (scope, message) => identities.sign(scope, message));
+  handle('pins', scope => identities.pins(scope));
+  handle('pin', (scope, id, pin) => identities.pin(scope, id, pin));
   handle('info', () => ({ name: os.hostname(), driverReady }));
   handle('sources', async () => {
     const sources = await desktopCapturer.getSources({ types: ['screen'], thumbnailSize: { width: 360, height: 225 } });

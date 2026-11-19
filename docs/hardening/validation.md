@@ -29,3 +29,23 @@ Screenshots generated locally in ignored `artifacts/`: `login-320.png`, `login-3
 - Execution of the new quality workflow on GitHub. Local success is not CI or production proof.
 
 The baseline lists proposed owners and release gates. No claim of full security, WCAG conformance or legal ADA compliance is made.
+
+## Trusted-device milestone / 0.3.0
+
+Date: 2026-11-19. Evidence collected locally before commit, publication and deployment; release status is checked separately. This section supersedes the account-only protocol observations above; it does not close the outstanding manual, platform or independent-review gates.
+
+| Check | Result and scope |
+| --- | --- |
+| `npm test` | 17 passed against disposable PostgreSQL. Includes immutable key enrollment, nonce reuse/account binding, stolen-token-only socket rejection, signed-message replay, local-pair requirements, endpoint-only revocation/session teardown, stale invitation rejection, modified/cross-session SDP signatures, fresh client-nonce binding, vault corruption/unavailability, and trust/revocation persistence across service restart. |
+| `npm run test:ui` | 11 passed. Includes real local WebRTC with synthetic capture/mocked input, QR/link pairing and separate Mac consent, decline/retry, browser key/pin persistence, rejection of wrong invitation secrets, forged phone requests and altered Mac certificates, active-session revocation, legacy-server upgrade guidance, selected axe rules and responsive states. |
+| Actual packaged Mac authentication | Passed `MAC_APP_EXECUTABLE` override of `tests/ui/desktop.spec.ts` against a disposable service. The built app signed in, enrolled its OS-protected device key, showed setup, preserved renderer isolation, and rejected unapproved native input. No screen/input permissions were granted. |
+| `npm run desktop:package` and strict tamper check | Passed 0.3.0 app/helper resource verification. Modified resources are rejected. Existing runtime flags/entitlements were preserved. This is ad-hoc integrity, not Developer ID trust or notarization. |
+| Local ZIP/extraction | Created ignored `release/MacRemote-0.3.0-mac-arm64.zip` and `release/SHA256SUMS`. Extracted a fresh copy, repeated strict signature/helper verification and packaged launch smoke; passed before public publication. |
+| `npm run test:image` | Passed final Docker build, built UI/font/documentation rendering, automatic migration, signed device enrollment, and account/device persistence across container restart. No production database was used. |
+| `npm run ios:sync` | Passed TypeScript/Vite build and Capacitor sync. No iOS compilation, native secure-key plugin, physical-device install or TestFlight validation. |
+| npm advisories | Production-only audit: zero entries. Final clean Docker install reports six moderate build dependency entries; no high/critical entries reported. No Snyk/Strix scan was performed. |
+| Source hygiene | `git diff --check` passed. Ongale-managed deploy workflow unchanged. No credentials, runtime key files, QR secrets or generated artifacts are staged for Git. |
+
+Protocol, key-storage boundaries, account MFA/recovery gaps and coordinated release order are documented in [trusted devices](../trusted-devices.md). Native keys use encrypted software storage; the current phone website and iOS wrapper use non-extractable browser CryptoKeys, not Secure Enclave keys. Native capture/input, VoiceOver, carrier/TURN and clean-download Gatekeeper testing remain outside this evidence.
+
+For packaged authentication testing after building, set `MAC_APP_EXECUTABLE` to the app's `Contents/MacOS/Mac Remote` executable and invoke the existing PostgreSQL test runner with Playwright's `tests/ui/desktop.spec.ts`. This uses disposable accounts/databases and never requires production credentials.

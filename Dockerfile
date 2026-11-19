@@ -7,6 +7,7 @@ COPY tsconfig.json vite.config.ts index.html components.json capacitor.config.ts
 COPY fonts.source.json ./
 COPY scripts/prepare-fonts.cjs ./scripts/prepare-fonts.cjs
 COPY src ./src
+COPY shared ./shared
 COPY public ./public
 COPY docs/getting-started ./docs/getting-started
 RUN npm run build
@@ -19,6 +20,7 @@ RUN npm ci --omit=dev --ignore-scripts && npm cache clean --force
 COPY --from=build /app/dist ./dist
 COPY server.js release.config.json ./
 COPY signaling ./signaling
+COPY shared ./shared
 USER node
 EXPOSE 3000
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 CMD node -e "fetch('http://127.0.0.1:'+(process.env.PORT||3000)+'/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"

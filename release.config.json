@@ -1,9 +1,9 @@
 {
-  "version": "0.2.4",
+  "version": "0.3.0",
   "architecture": "arm64",
   "minimumMacOS": "13.0",
   "signed": false,
-  "url": "https://github.com/solcoded-art/remotely/releases/download/mac-v0.2.4/MacRemote-0.2.4-mac-arm64.zip",
+  "url": "https://github.com/solcoded-art/remotely/releases/download/mac-v0.3.0/MacRemote-0.3.0-mac-arm64.zip",
   "signature": "ad-hoc",
   "notarized": false
 }

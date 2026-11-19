@@ -1,6 +1,6 @@
 # Mac Remote
 
-A downloadable iOS client and Mac desktop companion, paired through email/password accounts. The shared React interface uses official shadcn/ui components and adapts to phones, landscape, tablets, and desktop windows.
+A downloadable iOS client and Mac desktop companion, paired through email/password accounts, one-use QR links and approved device keys. The shared React interface uses official shadcn/ui components and adapts to phones, landscape, tablets, and desktop windows.
 
 The Mac shares a selected display over WebRTC. Video and input use the peer connection; the hosted service handles accounts, device discovery, and signaling. The Mac user approves each session. Direct connections are preferred, with optional TURN relay credentials for difficult networks.
 
@@ -29,7 +29,7 @@ For the actual Mac companion:
 npm run desktop
 ```
 
-Create an account, then sign in on both devices using the same HTTPS account-server origin. Local desktop development permits `http://127.0.0.1:3000`; a native iPhone needs the deployed HTTPS server. Select a display in the Mac companion, grant macOS permissions, connect from the phone, and approve on the Mac.
+Create an account, then sign in on both devices using the same HTTPS account-server origin. Local desktop development permits `http://127.0.0.1:3000`; a native iPhone needs the deployed HTTPS server. In the Mac companion, create a pairing link. Scan its QR code with your phone’s Camera (or paste the full link on the phone), then approve pairing on the Mac. Select a display, grant macOS permissions, connect from the paired phone, and approve each session on the Mac. See [the trusted-device protocol and limitations](docs/trusted-devices.md).
 
 ## Work with your apps
 

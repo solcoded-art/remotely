@@ -59,3 +59,15 @@ test('Mac checklist detects missing permission and refreshes after returning fro
     await page.screenshot({ path: 'artifacts/setup-milestone-mac.png', fullPage: true });
   } finally { await context.close(); }
 });
+
+test('an older account server shows upgrade guidance before creating any device key', async ({ page }) => {
+  await page.route('**/api/auth/login', route => route.fulfill({ json: { user: { id: 'legacy-user-12345678', email: 'legacy@example.com' }, token: 'test-only-token', expires: Date.now() + 60000 } }));
+  await page.route('**/api/health', route => route.fulfill({ json: { status: 'ok' } }));
+  await page.goto('/');
+  await page.getByLabel('Email address').fill('legacy@example.com'); await page.getByLabel('Password', { exact: true }).fill('legacy-test-password');
+  await page.getByRole('button', { name: 'Sign in', exact: true }).click();
+  await expect(page.getByRole('alert')).toContainText('needs a trusted-device update');
+  await expect(page.getByRole('button', { name: 'Retry connection' })).toBeVisible();
+  expect(await page.evaluate(async () => (await indexedDB.databases()).some(db => db.name === 'remotely-trusted-devices'))).toBe(false);
+  await expectAccessible(page);
+});

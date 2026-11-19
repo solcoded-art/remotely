@@ -67,16 +67,23 @@ async function createStore(connectionString) {
     },
     async revoke(token) { await pool.query('DELETE FROM remote_sessions WHERE hash = $1', [digest(token)]); },
     async deleteUser(id) { await pool.query('DELETE FROM remote_users WHERE id = $1', [id]); },
-    async registerDevice(id, userId, name, kind) {
-      const result = await pool.query(`INSERT INTO remote_devices (id, user_id, name, kind) VALUES ($1, $2, $3, $4)
+    async registerDevice(id, userId, name, kind, publicKey) {
+      const result = await pool.query(`INSERT INTO remote_devices (id, user_id, name, kind, public_key) VALUES ($1, $2, $3, $4, $5)
         ON CONFLICT(id) DO UPDATE SET name = EXCLUDED.name
-        WHERE remote_devices.user_id = EXCLUDED.user_id AND remote_devices.kind = EXCLUDED.kind
-        RETURNING id, name, kind`, [id, userId, name, kind]);
+        WHERE remote_devices.user_id = EXCLUDED.user_id AND remote_devices.kind = EXCLUDED.kind AND remote_devices.public_key = EXCLUDED.public_key
+        RETURNING id, name, kind, public_key AS "publicKey"`, [id, userId, name, kind, JSON.stringify(publicKey)]);
       if (!result.rowCount) throw Object.assign(new Error('Device does not belong to this account.'), { status: 403 });
       return result.rows[0];
     },
-    async device(id) { return (await pool.query('SELECT * FROM remote_devices WHERE id = $1', [id])).rows[0]; },
-    async devices(userId) { return (await pool.query('SELECT id, name, kind FROM remote_devices WHERE user_id = $1 ORDER BY name', [userId])).rows; },
+    async device(id) { return (await pool.query('SELECT *, public_key AS "publicKey" FROM remote_devices WHERE id = $1', [id])).rows[0]; },
+    async devices(userId) { return (await pool.query('SELECT id, name, kind, public_key AS "publicKey" FROM remote_devices WHERE user_id = $1 ORDER BY name', [userId])).rows; },
+    async pair(grant) {
+      await pool.query(`INSERT INTO remote_trust (id, user_id, desktop_id, controller_id, document)
+        VALUES ($1, $2, $3, $4, $5) ON CONFLICT (desktop_id, controller_id)
+        DO UPDATE SET id = EXCLUDED.id, document = EXCLUDED.document`, [grant.id, grant.userId, grant.desktopId, grant.controllerId, JSON.stringify(grant)]);
+    },
+    async pairing(desktop, controller) { return (await pool.query('SELECT id, document FROM remote_trust WHERE desktop_id = $1 AND controller_id = $2', [desktop, controller])).rows[0]; },
+    async unpair(id, deviceId) { return (await pool.query('DELETE FROM remote_trust WHERE id = $1 AND (desktop_id = $2 OR controller_id = $2) RETURNING *', [id, deviceId])).rows[0]; },
     async close() { await pool.end(); },
   };
 }

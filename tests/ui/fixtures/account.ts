@@ -2,7 +2,7 @@ import { expect, type Page } from '@playwright/test';
 
 export async function login(page: Page, email: string, register = false) {
   await page.goto('/');
-  if (await page.evaluate(() => !!window.macRemote)) {
+  {
     await page.getByRole('button', { name: 'Advanced connection settings' }).click();
     await page.getByLabel('Account server URL').fill('http://127.0.0.1:3000');
   }

@@ -12,6 +12,13 @@ function isId(value) { return typeof value === 'string' && /^[\w-]{8,80}$/.test(
 function text(value, max) { return typeof value === 'string' && value.length > 0 && value.length <= max; }
 
 async function createService(options = {}) {
+  const trust = await import('../shared/trust.mjs');
+  const challenges = new Map();
+  const invites = new Map();
+  const pairRequests = new Map();
+  const revoking = new Set();
+  const pairEpochs = new Map();
+  const pairKey = (desktop, controller) => `${desktop}:${controller}`;
   let publicOrigin = null;
   if (process.env.PUBLIC_URL) {
     try {
@@ -101,7 +108,7 @@ async function createService(options = {}) {
     try {
       const route = new URL(req.url, 'http://localhost').pathname;
       if (await downloads.handle(route, req, res)) return;
-      if (['/api/health', '/health'].includes(route) && req.method === 'GET') return json(200, { status: 'ok' });
+      if (['/api/health', '/health'].includes(route) && req.method === 'GET') return json(200, { status: 'ok', deviceTrust: 1 });
       if (req.method === 'GET' && route === '/docs/getting-started') { res.writeHead(308, { Location: '/docs/getting-started/' }); res.end(); return; }
       if (req.method === 'GET' && !route.startsWith('/api/') && route !== '/ws') {
         const relative = route === '/' ? '/index.html' : route === '/docs/getting-started/' ? '/docs/getting-started/index.html' : decodeURIComponent(route);
@@ -151,11 +158,23 @@ async function createService(options = {}) {
       if (route === '/api/me' && req.method === 'GET') return json(200, { user });
       if (route === '/api/ice' && req.method === 'GET') return json(200, { iceServers: iceServers(user.id) });
       if (route === '/api/devices' && req.method === 'GET') return json(200, { devices: await devices(user.id) });
+      if (route === '/api/device-challenge' && req.method === 'POST') {
+        if (limited(`enroll:${user.id}`, 30, 60000) || challenges.size >= 10000) throw fail(429, 'Too many device enrollments. Try again shortly.');
+        const challenge = trust.nonce();
+        challenges.set(challenge, { userId: user.id, expires: Date.now() + 60000 });
+        return json(200, { challenge });
+      }
       if (route === '/api/devices' && req.method === 'POST') {
         const data = await readBody(req);
+        if (!data.publicKey) throw fail(426, 'Update the Mac app and reload your phone to use trusted-device pairing.');
+        const challenge = challenges.get(data.challenge); challenges.delete(data.challenge);
+        if (!challenge || challenge.userId !== user.id || challenge.expires < Date.now()) throw fail(403, 'Device enrollment expired. Try again.');
+        let key;
+        try { key = trust.publicKey(data.publicKey); } catch { throw fail(400, 'Invalid device key.'); }
+        if (await trust.keyId(key) !== data.id || !await trust.verify(key, trust.registration(data.challenge, user.id, data), data.signature)) throw fail(403, 'Device key proof is required.');
         if (!isId(data.id) || !text(data.name, 80) || !['desktop', 'controller'].includes(data.kind)) throw fail(400, 'Invalid device details.');
-        if (!await store.device(data.id) && (await store.devices(user.id)).length >= 20) throw fail(409, 'Device limit reached.');
-        const device = await store.registerDevice(data.id, user.id, data.name.trim(), data.kind);
+        if (!await store.device(data.id) && (await store.devices(user.id)).filter(device => device.publicKey).length >= 20) throw fail(409, 'Device limit reached.');
+        const device = await store.registerDevice(data.id, user.id, data.name.trim(), data.kind, key);
         await broadcast(user.id); return json(200, { device });
       }
       throw fail(404, 'Not found.');
@@ -174,19 +193,23 @@ async function createService(options = {}) {
     let alive = true;
     let serial = Promise.resolve();
     let queued = 0;
+    const socketChallenge = trust.nonce();
+    let sequence = 0;
+    send(ws, { type: 'challenge', challenge: socketChallenge });
     const authTimer = setTimeout(() => ws.close(4001, 'Authentication required'), 5000);
     ws.on('pong', () => { alive = true; });
     ws.on('error', () => {});
     async function onMessage(raw, binary) {
       try {
         if (binary) throw fail(400, 'JSON messages only.');
-        const data = JSON.parse(raw.toString());
+        let data = JSON.parse(raw.toString());
         if (!data || typeof data !== 'object') throw fail(400, 'Invalid message.');
         if (!identity) {
           if (data.type !== 'hello') throw fail(401, 'Authenticate first.');
           const user = await store.authenticate(data.token);
           const device = isId(data.deviceId) && await store.device(data.deviceId);
           if (!user || !device || device.user_id !== user.id) throw fail(401, 'Invalid device session.');
+          if (!device.publicKey || !await trust.verify(device.publicKey, trust.hello(socketChallenge, user.id, device.id), data.signature)) throw fail(401, 'Device key proof is required. Update the app if needed.');
           if (ws.readyState !== 1) return;
           if (peers.has(device.id)) {
             for (const [id, session] of sessions) if ([session.desktop, session.controller].includes(device.id)) finish(id, 'Device reconnected');
@@ -198,34 +221,90 @@ async function createService(options = {}) {
           send(ws, { type: 'ready', deviceId: device.id });
           await broadcast(user.id); return;
         }
+        if (peers.get(identity.device.id)?.ws !== ws) throw fail(403, 'Device connection was replaced.');
+        if (!Number.isSafeInteger(data.seq) || data.seq !== sequence + 1 || !data.data || !await trust.verify(identity.device.publicKey, trust.envelope(socketChallenge, identity.user.id, identity.device.id, data.seq, data.data), data.signature)) throw fail(403, 'Invalid or replayed device proof.');
+        sequence = data.seq; data = data.data;
         if (!await store.authenticate(identity.token)) { ws.close(4001, 'Session expired'); return; }
+        if (peers.get(identity.device.id)?.ws !== ws) throw fail(403, 'Device connection was replaced.');
         if (limited(`ws:${identity.device.id}`, 180, 1000)) throw fail(429, 'Too many messages.');
+        if (data.type === 'pair-open') {
+          if (identity.device.kind !== 'desktop' || !isId(data.inviteId) || !Number.isSafeInteger(data.expires) || data.expires <= Date.now() || data.expires > Date.now() + 180000) throw fail(400, 'Invalid pairing invitation.');
+          if (invites.has(data.inviteId) && invites.get(data.inviteId).desktop !== identity.device.id) throw fail(403, 'Pairing invitation is unavailable.');
+          for (const [id, invite] of invites) if (invite.desktop === identity.device.id) invites.delete(id);
+          invites.set(data.inviteId, { desktop: identity.device.id, expires: data.expires }); send(ws, { type: 'pair-opened', inviteId: data.inviteId }); return;
+        }
+        if (data.type === 'pair-request') {
+          if (identity.device.kind !== 'controller' || !isId(data.requestId) || !text(data.proof, 100) || limited(`pair:${identity.user.id}`, 10, 60000)) throw fail(400, 'Invalid pairing request or too many attempts.');
+          const invite = invites.get(data.inviteId); const host = peers.get(invite?.desktop);
+          if (!invite || invite.expires <= Date.now() || !host || host.user.id !== identity.user.id) throw fail(403, 'Pairing link expired or Mac unavailable. Create a new link on your Mac.');
+          if (pairRequests.has(data.requestId) || [...pairRequests.values()].filter(r => r.desktop === host.device.id).length >= 5) throw fail(409, 'Pairing is busy. Try again shortly.');
+          pairRequests.set(data.requestId, { desktop: host.device.id, controller: identity.device.id, inviteId: data.inviteId, expires: invite.expires });
+          send(host.ws, { type: 'pair-request', requestId: data.requestId, inviteId: data.inviteId, peerId: identity.device.id, name: identity.device.name, publicKey: identity.device.publicKey, proof: data.proof }); return;
+        }
+        if (['pair-approve', 'pair-decline'].includes(data.type)) {
+          const pending = pairRequests.get(data.requestId); const invite = invites.get(pending?.inviteId);
+          if (!pending || pending.desktop !== identity.device.id || !invite || invite.expires <= Date.now()) throw fail(403, 'Pairing request expired.');
+          if (data.type === 'pair-decline') {
+            pairRequests.delete(data.requestId); send(peers.get(pending.controller)?.ws, { type: 'pair-declined', requestId: data.requestId }); return;
+          }
+          const controller = peers.get(pending.controller); const grant = data.grant;
+          if (!controller || !grant || !isId(grant.id) || grant.userId !== identity.user.id || grant.desktopId !== pending.desktop || grant.controllerId !== pending.controller || grant.inviteId !== pending.inviteId || grant.requestId !== data.requestId || await trust.keyId(grant.desktopKey) !== pending.desktop || await trust.keyId(grant.controllerKey) !== pending.controller || !await trust.verify(identity.device.publicKey, trust.grantText(grant), data.signature)) throw fail(403, 'Invalid pairing approval.');
+          // Consume before awaiting the database: simultaneous approval cannot reuse the invitation.
+          invites.delete(pending.inviteId);
+          for (const [id, request] of pairRequests) if (request.inviteId === pending.inviteId) pairRequests.delete(id);
+          for (const [id, session] of sessions) if (session.desktop === pending.desktop && session.controller === pending.controller) finish(id, 'Device paired again');
+          await store.pair(grant);
+          const epochKey = pairKey(grant.desktopId, grant.controllerId); pairEpochs.set(epochKey, (pairEpochs.get(epochKey) || 0) + 1);
+          send(controller.ws, { type: 'paired', grant, signature: data.signature, name: identity.device.name });
+          send(ws, { type: 'paired', grant, signature: data.signature, name: controller.device.name }); return;
+        }
+        if (data.type === 'revoke') {
+          if (!isId(data.grantId)) throw fail(400, 'Invalid trusted device.');
+          revoking.add(data.grantId);
+          let pair;
+          try { pair = await store.unpair(data.grantId, identity.device.id); }
+          finally { revoking.delete(data.grantId); }
+          if (!pair) throw fail(403, 'Trusted device is unavailable.');
+          const epochKey = pairKey(pair.desktop_id, pair.controller_id); pairEpochs.set(epochKey, (pairEpochs.get(epochKey) || 0) + 1);
+          for (const [id, session] of sessions) if (session.grantId === data.grantId) finish(id, 'Device trust revoked');
+          for (const id of [pair.desktop_id, pair.controller_id]) send(peers.get(id)?.ws, { type: 'revoked', grantId: data.grantId }); return;
+        }
         if (data.type === 'connect') {
           if (identity.device.kind !== 'controller') throw fail(403, 'Only a controller can request access.');
           const desktop = peers.get(data.targetId);
           if (!desktop || desktop.device.kind !== 'desktop' || desktop.user.id !== identity.user.id) throw fail(404, 'Mac is offline or unavailable.');
+          const epochKey = pairKey(desktop.device.id, identity.device.id); const epoch = pairEpochs.get(epochKey) || 0;
+          const pair = await store.pairing(desktop.device.id, identity.device.id);
+          if (!pair || revoking.has(pair.id)) throw fail(403, 'Pair this phone with your Mac before connecting.');
+          if (!text(data.controllerNonce, 100) || trust.unb64(data.controllerNonce).length !== 32 || !await trust.verify(identity.device.publicKey, trust.sessionRequest(identity.user.id, pair.id, desktop.device.id, identity.device.id, data.controllerNonce), data.requestSignature)) throw fail(403, 'Controller session proof is required.');
+          if (revoking.has(pair.id) || epoch !== (pairEpochs.get(epochKey) || 0)) throw fail(403, 'Device trust changed. Pair again before connecting.');
+          if (peers.get(desktop.device.id)?.ws !== desktop.ws || peers.get(identity.device.id)?.ws !== ws) throw fail(409, 'Device reconnected. Try again.');
           if ([...sessions.values()].some(s => [s.desktop, s.controller].includes(desktop.device.id) || [s.desktop, s.controller].includes(identity.device.id))) throw fail(409, 'A device already has a pending or active session.');
           const id = randomUUID();
           const timer = setTimeout(() => finish(id, 'Approval timed out'), 60000);
-          sessions.set(id, { desktop: desktop.device.id, controller: identity.device.id, approved: false, timer });
-          send(ws, { type: 'pending', sessionId: id, name: desktop.device.name });
-          send(desktop.ws, { type: 'request', sessionId: id, name: identity.device.name }); return;
+          sessions.set(id, { desktop: desktop.device.id, controller: identity.device.id, approved: false, timer, grantId: pair.id, controllerNonce: data.controllerNonce });
+          send(ws, { type: 'pending', sessionId: id, name: desktop.device.name, peerId: desktop.device.id, grantId: pair.id, controllerNonce: data.controllerNonce });
+          send(desktop.ws, { type: 'request', sessionId: id, name: identity.device.name, peerId: identity.device.id, grantId: pair.id, controllerNonce: data.controllerNonce, requestSignature: data.requestSignature }); return;
         }
         const session = sessions.get(data.sessionId);
         if (!session || ![session.desktop, session.controller].includes(identity.device.id)) throw fail(403, 'Session is unavailable.');
         if (data.type === 'approve') {
           if (session.desktop !== identity.device.id || session.approved) throw fail(403, 'Only the Mac can approve a pending request.');
           if (data.allowed !== true) { finish(data.sessionId, 'Mac declined the connection'); return; }
-          clearTimeout(session.timer); session.approved = true;
-          for (const id of [session.desktop, session.controller]) send(peers.get(id)?.ws, { type: 'approved', sessionId: data.sessionId }); return;
+          if (!text(data.desktopNonce, 100) || trust.unb64(data.desktopNonce).length !== 32 || !await trust.verify(identity.device.publicKey, trust.sessionApproval(data.sessionId, identity.user.id, session.grantId, session.desktop, session.controller, session.controllerNonce, data.desktopNonce), data.approvalSignature)) throw fail(403, 'Mac session proof is required.');
+          if (sessions.get(data.sessionId) !== session || revoking.has(session.grantId)) throw fail(403, 'Session is unavailable.');
+          clearTimeout(session.timer); session.approved = true; session.desktopNonce = data.desktopNonce;
+          for (const id of [session.desktop, session.controller]) send(peers.get(id)?.ws, { type: 'approved', sessionId: data.sessionId, desktopNonce: data.desktopNonce, approvalSignature: data.approvalSignature }); return;
         }
         if (data.type === 'end') { finish(data.sessionId); return; }
         if (data.type === 'signal') {
           if (!session.approved) throw fail(403, 'Mac approval is required.');
           if (!data.signal || typeof data.signal !== 'object' || !['offer', 'answer', 'ice'].includes(data.signal.type)) throw fail(400, 'Invalid signal.');
           if ((data.signal.type === 'offer' && identity.device.id !== session.desktop) || (data.signal.type === 'answer' && identity.device.id !== session.controller)) throw fail(403, 'Unexpected negotiation role.');
+          if (!Number.isSafeInteger(data.seq) || data.seq < 1 || !text(data.signature, 100) || !await trust.verify(identity.device.publicKey, trust.signalText(data.sessionId, session.grantId, identity.device.id, data.seq, data.signal, session.controllerNonce + '.' + session.desktopNonce), data.signature)) throw fail(403, 'Invalid peer identity signature.');
+          if (sessions.get(data.sessionId) !== session || revoking.has(session.grantId)) throw fail(403, 'Session is unavailable.');
           const recipient = session.desktop === identity.device.id ? session.controller : session.desktop;
-          send(peers.get(recipient)?.ws, { type: 'signal', sessionId: data.sessionId, signal: data.signal }); return;
+          send(peers.get(recipient)?.ws, { type: 'signal', sessionId: data.sessionId, signal: data.signal, seq: data.seq, signature: data.signature }); return;
         }
         throw fail(400, 'Unknown message.');
       } catch (error) { send(ws, { type: 'error', message: error.status ? error.message : 'Invalid message.' }); if (!identity) ws.close(4001, 'Authentication failed'); }
@@ -238,6 +317,8 @@ async function createService(options = {}) {
       clearTimeout(authTimer);
       if (!identity || peers.get(identity.device.id)?.ws !== ws) return;
       peers.delete(identity.device.id);
+      for (const [id, invite] of invites) if (invite.desktop === identity.device.id) invites.delete(id);
+      for (const [id, request] of pairRequests) if ([request.desktop, request.controller].includes(identity.device.id)) pairRequests.delete(id);
       for (const [id, session] of sessions) if ([session.desktop, session.controller].includes(identity.device.id)) finish(id, 'Device disconnected');
       if (!closing) broadcast(identity.user.id).catch(() => {});
     });
@@ -249,6 +330,8 @@ async function createService(options = {}) {
         else peer.ping();
       } catch { peer.ws.terminate(); }
     }
+    for (const key of pairEpochs.keys()) if (key.split(':').every(id => !peers.has(id))) pairEpochs.delete(key);
+    for (const collection of [challenges, invites, pairRequests]) for (const [key, value] of collection) if (value.expires <= Date.now()) collection.delete(key);
     for (const [key, bucket] of buckets) if (bucket.until <= Date.now()) buckets.delete(key);
   }, 15000);
   heartbeat.unref();

@@ -27,6 +27,22 @@ test('real login and WebRTC connection with a synthetic desktop capture', async 
   await desktop.getByRole('button', { name: 'Main display' }).click();
   await login(phone, email);
   await expect(phone.getByText('Test Mac', { exact: true })).toBeVisible();
+  await expect(phone.getByRole('button', { name: 'Connect to Test Mac', exact: true })).toBeDisabled();
+  await desktop.getByRole('button', { name: 'Create pairing link', exact: true }).click();
+  await expect(desktop.getByRole('img', { name: /Pairing QR/ })).toBeVisible();
+  const link = await desktop.getByLabel('One-use pairing link', { exact: true }).inputValue();
+  await phone.getByLabel('Pairing link from your Mac').fill(link);
+  await phone.getByRole('button', { name: 'Request pairing', exact: true }).click();
+  await expect(desktop.getByRole('region', { name: 'Pairing approval' })).toBeVisible();
+  await expect(desktop.locator('video')).toHaveCount(0);
+  await expectAccessible(desktop); await expectAccessible(phone);
+  await desktop.getByRole('button', { name: 'Allow pairing', exact: true }).click();
+  await expect(phone.getByRole('button', { name: 'Connect to Test Mac', exact: true })).toBeEnabled();
+  await phone.screenshot({ path: 'artifacts/trusted-phone.png', fullPage: true });
+  await phone.getByRole('button', { name: 'Connect to Test Mac', exact: true }).click();
+  await expect(phone.getByText('Approve on your Mac', { exact: true })).toBeVisible();
+  await desktop.getByRole('button', { name: 'Decline', exact: true }).click();
+  await expect(phone.getByRole('heading', { name: 'My devices' })).toBeVisible();
   await phone.getByRole('button', { name: 'Connect to Test Mac', exact: true }).click();
   await expect(phone.getByText('Approve on your Mac', { exact: true })).toBeVisible();
   await expectAccessible(desktop);
@@ -67,10 +83,16 @@ test('real login and WebRTC connection with a synthetic desktop capture', async 
   await expect.poll(() => desktop.evaluate(() => (window as any).commands.some((value: any) => value.action === 'drag' && value.dx === 20))).toBe(true);
   await phone.getByRole('tab', { name: 'Apps', exact: true }).click();
   await expect.poll(() => desktop.evaluate(() => (window as any).commands.some((value: any) => value.action === 'up'))).toBe(true);
-  await phone.getByRole('button', { name: 'Disconnect', exact: true }).click();
+  await desktop.getByRole('button', { name: 'Revoke My iPhone', exact: true }).click();
+  await expectAccessible(desktop);
+  await desktop.getByRole('button', { name: 'Revoke device', exact: true }).click();
   await expect(phone.getByRole('heading', { name: 'My devices' })).toBeVisible();
-  await expect(desktop.getByText('Session active', { exact: true })).not.toBeVisible();
   await expect(phone.getByRole('heading', { level: 1 })).toBeFocused();
+  await expect(desktop.getByText('Session active', { exact: true })).not.toBeVisible();
+  await expect(phone.getByRole('button', { name: 'Connect to Test Mac', exact: true })).toBeDisabled();
+  await phone.getByLabel('Pairing link from your Mac').fill(link);
+  await phone.getByRole('button', { name: 'Request pairing', exact: true }).click();
+  await expect(phone.getByRole('alert')).toContainText('expired');
   await desktopContext.close(); await phoneContext.close();
 });
 
@@ -114,4 +136,61 @@ test('the documentation keeps unpublished installers disabled', async ({ page })
   await page.goto('/docs/getting-started/');
   await expect(page.getByRole('button', { name: 'Mac download temporarily unavailable' })).toBeDisabled();
   await expect(page.getByRole('link', { name: 'Download Mac app' })).toHaveCount(0);
+});
+
+test('a wrong pairing secret and a signaling relay that changes the Mac certificate are rejected', async ({ browser }) => {
+  const desktopContext = await browser.newContext({ viewport: { width: 1280, height: 900 } });
+  const phoneContext = await browser.newContext({ viewport: { width: 390, height: 844 } });
+  let altered = false; let alterRequest = true;
+  await desktopContext.routeWebSocket('**/ws', socket => {
+    const server = socket.connectToServer();
+    server.onMessage(message => {
+      const data = JSON.parse(String(message));
+      if (data.type === 'request' && alterRequest) { data.requestSignature = 'forged-by-signaling-service'; alterRequest = false; }
+      socket.send(JSON.stringify(data));
+    });
+  });
+  await phoneContext.routeWebSocket('**/ws', socket => {
+    const server = socket.connectToServer();
+    server.onMessage(message => {
+      const data = JSON.parse(String(message));
+      if (data.type === 'signal' && data.signal?.type === 'offer') { data.signal.sdp += '\r\na=fingerprint:sha-256 changed-by-relay\r\n'; altered = true; }
+      socket.send(JSON.stringify(data));
+    });
+  });
+  await installMacFixture(desktopContext);
+  const desktop = await desktopContext.newPage(); const phone = await phoneContext.newPage();
+  try {
+    const email = `tamper-${Date.now()}@example.com`;
+    await login(desktop, email, true); await login(phone, email);
+    await desktop.getByRole('button', { name: 'Create pairing link', exact: true }).click();
+    const original = await desktop.getByLabel('One-use pairing link', { exact: true }).inputValue();
+    const wrong = new URL(original);
+    wrong.hash = await phone.evaluate(hash => {
+      const value = JSON.parse(atob(hash.slice(6).replaceAll('-', '+').replaceAll('_', '/')));
+      value.secret = btoa(String.fromCharCode(...crypto.getRandomValues(new Uint8Array(32)))).replaceAll('+', '-').replaceAll('/', '_').replaceAll('=', '');
+      return '#pair=' + btoa(JSON.stringify(value)).replaceAll('+', '-').replaceAll('/', '_').replaceAll('=', '');
+    }, wrong.hash);
+    await phone.getByLabel('Pairing link from your Mac').fill(wrong.toString()); await phone.getByRole('button', { name: 'Request pairing', exact: true }).click();
+    await expect(phone.getByRole('status').filter({ hasText: 'Mac declined pairing' })).toBeVisible();
+    await expect(desktop.getByRole('button', { name: 'Allow pairing', exact: true })).toHaveCount(0);
+    await phone.getByLabel('Pairing link from your Mac').fill(original); await phone.getByRole('button', { name: 'Request pairing', exact: true }).click();
+    await desktop.getByRole('button', { name: 'Allow pairing', exact: true }).click();
+    await expect(phone.getByRole('button', { name: 'Connect to Test Mac', exact: true })).toBeEnabled();
+    // A reload loses the login token, but preserves the non-extractable key and approved Mac pin.
+    await login(phone, email);
+    await expect(phone.getByRole('button', { name: 'Connect to Test Mac', exact: true })).toBeEnabled();
+    await desktop.getByRole('button', { name: 'Choose display', exact: true }).click(); await desktop.getByRole('button', { name: 'Main display', exact: true }).click();
+    await phone.getByRole('button', { name: 'Connect to Test Mac', exact: true }).click();
+    await expect(desktop.getByRole('alert')).toContainText('phone did not prove this connection request');
+    await expect(phone.getByRole('heading', { name: 'My devices' })).toBeVisible();
+    await expect(desktop.getByRole('button', { name: 'Allow connection', exact: true })).toHaveCount(0);
+    await expect(desktop.locator('video')).toHaveCount(0);
+    await phone.getByRole('button', { name: 'Connect to Test Mac', exact: true }).click(); await desktop.getByRole('button', { name: 'Allow connection', exact: true }).click();
+    await expect(phone.getByRole('alert')).toContainText('Peer identity verification failed');
+    expect(altered).toBe(true);
+    await expect(phone.locator('video')).toHaveCount(0);
+    await expect.poll(() => desktop.evaluate(() => (window as any).commands.length)).toBe(0);
+    await expect(desktop.locator('video')).toHaveCount(0);
+  } finally { await desktopContext.close(); await phoneContext.close(); }
 });

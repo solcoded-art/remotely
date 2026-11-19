@@ -1,5 +1,5 @@
 const { execFileSync } = require('node:child_process');
-const { randomUUID } = require('node:crypto');
+const { randomUUID, generateKeyPairSync, sign } = require('node:crypto');
 const assert = require('node:assert/strict');
 const { chromium } = require('@playwright/test');
 const fs = require('node:fs');
@@ -67,7 +67,13 @@ async function main() {
     const authResponse = await fetch(url + '/api/auth/register', { method: 'POST', headers: { 'Content-Type': 'application/json', Origin: url }, body: JSON.stringify({ email: 'image-test@example.com', password: 'image-smoke-password-123' }) });
     assert.equal(authResponse.status, 200); const auth = await authResponse.json();
     const headers = { Authorization: `Bearer ${auth.token}`, 'Content-Type': 'application/json', Origin: url };
-    assert.equal((await fetch(url + '/api/devices', { method: 'POST', headers, body: JSON.stringify({ id: randomUUID(), name: 'Image test Mac', kind: 'desktop' }) })).status, 200);
+    const trust = await import('../shared/trust.mjs');
+    const pair = generateKeyPairSync('ec', { namedCurve: 'prime256v1' });
+    const publicKey = trust.publicKey(pair.publicKey.export({ format: 'jwk' }));
+    const device = { id: await trust.keyId(publicKey), name: 'Image test Mac', kind: 'desktop', publicKey };
+    const challenge = (await (await fetch(url + '/api/device-challenge', { method: 'POST', headers, body: '{}' })).json()).challenge;
+    const signature = sign('sha256', Buffer.from(trust.registration(challenge, auth.user.id, device)), { key: pair.privateKey, dsaEncoding: 'ieee-p1363' }).toString('base64url');
+    assert.equal((await fetch(url + '/api/devices', { method: 'POST', headers, body: JSON.stringify({ ...device, challenge, signature }) })).status, 200);
     phase = 'restart and persistence';
     docker(['restart', service]); url = address(); headers.Origin = url; await healthy();
     const list = await (await fetch(url + '/api/devices', { headers })).json(); assert.equal(list.devices.length, 1);

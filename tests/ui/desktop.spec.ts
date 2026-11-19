@@ -3,7 +3,7 @@ import path from 'node:path';
 
 test('native desktop shell boots with isolated renderer and authenticated API access', async () => {
   test.skip(process.platform !== 'darwin', 'The native Mac companion requires macOS.');
-  const app = await electron.launch({ args: [path.resolve('.')], env: { ...process.env, ELECTRON_RUN_AS_NODE: undefined } as unknown as Record<string, string> });
+  const app = await electron.launch({ ...(process.env.MAC_APP_EXECUTABLE ? { executablePath: process.env.MAC_APP_EXECUTABLE, args: [] } : { args: [path.resolve('.')] }), env: { ...process.env, ELECTRON_RUN_AS_NODE: undefined } as unknown as Record<string, string> });
   try {
     const page = await app.firstWindow();
     await expect(page.getByText('Mac app', { exact: true })).toBeVisible();
