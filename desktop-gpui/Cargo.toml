@@ -1,0 +1,52 @@
+[package]
+name = "mac-remote-gpui"
+version = "0.1.0"
+edition = "2024"
+publish = false
+description = "Native GPUI build of the Mac Remote desktop companion (milestone 1: sign-in and devices)."
+
+[[bin]]
+name = "mac-remote"
+path = "src/main.rs"
+
+[dependencies]
+# runtime_shaders: compile Metal shaders at launch, so Command Line Tools are enough (no full Xcode `metal`).
+# screen-capture: GPUI's ScreenCaptureKit display listing and streaming (without it, listing always fails).
+gpui = { version = "=0.2.2", default-features = false, features = ["font-kit", "runtime_shaders", "screen-capture"] }
+ureq = { version = "3", default-features = false, features = ["rustls", "json"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = { version = "1", features = ["preserve_order"] }
+p256 = { version = "0.13", features = ["ecdsa"] }
+sha2 = "0.10"
+hmac = "0.12"
+base64 = "0.22"
+rand_core = { version = "0.6", features = ["getrandom"] }
+uuid = { version = "1", features = ["v4"] }
+tungstenite = { version = "0.27", default-features = false, features = ["handshake", "rustls-tls-webpki-roots"] }
+rustls = { version = "0.23", default-features = false, features = ["ring", "std", "tls12"] }
+async-channel = "2"
+qrcode = { version = "0.14", default-features = false }
+webrtc = "0.21"
+rtc = { version = "=0.21.1", default-features = false }
+async-trait = "0.1"
+objc = "0.2"
+tokio = { version = "1", features = ["rt-multi-thread", "sync", "time", "macros"] }
+bytes = "1"
+# Same versions gpui uses, so captured frames (core_video CVImageBuffer) can go straight to VideoToolbox.
+core-video = "=0.4.3"
+core-foundation = "=0.10.0"
+url = "2"
+anyhow = "1"
+security-framework = "3"
+unicode-segmentation = "1"
+
+[lints.rust]
+# The objc crate's macros test for this old cfg.
+unexpected_cfgs = { level = "warn", check-cfg = ['cfg(feature, values("cargo-clippy"))'] }
+
+[features]
+# Test-only stdin/stdout automation for tests/e2e-pairing.mjs. Never enable for builds people run.
+e2e = []
+
+[profile.dev.package."*"]
+opt-level = 1
