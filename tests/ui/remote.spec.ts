@@ -17,6 +17,8 @@ test('login is responsive at small phone, phone, landscape, and desktop sizes', 
 });
 
 test('real login and WebRTC connection with a synthetic desktop capture', async ({ browser }) => {
+  // One long journey across both clients: ~16s locally, but shared CI runners can take several times that.
+  test.setTimeout(120_000);
   const desktopContext = await browser.newContext({ viewport: { width: 1280, height: 900 } });
   const phoneContext = await browser.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
   await installMacFixture(desktopContext);
