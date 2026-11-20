@@ -8,7 +8,7 @@ export function Brand({ href }: { href?: string }) {
 export function AppShell({ children, actions }: { children: ReactNode; actions?: ReactNode }) {
   return <div className="app-shell dark">
     <a className="skip-link" href="#main-content">Skip to main content</a>
-    <header className="app-header"><div className="brand-lockup"><Brand /><span className="brand-context">Your workspace, anywhere.</span></div><div className="header-actions">{actions}</div></header>
+    <header className="app-header"><div className="brand-lockup"><Brand /></div><div className="header-actions">{actions}</div></header>
     {children}
   </div>;
 }

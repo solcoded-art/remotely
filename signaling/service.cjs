@@ -54,6 +54,7 @@ async function createService(options = {}) {
   const sessions = new Map();
   const buckets = new Map();
   let closing = false;
+  const sessionGraceMs = options.sessionGraceMs ?? 90000;
   function limited(key, limit, interval) {
     const now = Date.now();
     let bucket = buckets.get(key);
@@ -69,7 +70,7 @@ async function createService(options = {}) {
   function finish(id, reason = 'Session ended') {
     const session = sessions.get(id);
     if (!session) return;
-    clearTimeout(session.timer);
+    clearTimeout(session.timer); clearTimeout(session.awayTimer);
     sessions.delete(id);
     for (const deviceId of [session.desktop, session.controller]) send(peers.get(deviceId)?.ws, { type: 'ended', sessionId: id, reason });
   }
@@ -211,10 +212,14 @@ async function createService(options = {}) {
           if (!user || !device || device.user_id !== user.id) throw fail(401, 'Invalid device session.');
           if (!device.publicKey || !await trust.verify(device.publicKey, trust.hello(socketChallenge, user.id, device.id), data.signature)) throw fail(401, 'Device key proof is required. Update the app if needed.');
           if (ws.readyState !== 1) return;
-          if (peers.has(device.id)) {
-            for (const [id, session] of sessions) if ([session.desktop, session.controller].includes(device.id)) finish(id, 'Device reconnected');
-            peers.get(device.id).ws.close(4000, 'Device reconnected');
+          // An approved session survives the same device signing back in (phone locked, tab
+          // switched, network change); a pending request does not.
+          for (const [id, session] of sessions) {
+            if (![session.desktop, session.controller].includes(device.id)) continue;
+            if (!session.approved) { finish(id, 'Device reconnected'); continue; }
+            if (session.away === device.id) { clearTimeout(session.awayTimer); session.away = null; }
           }
+          if (peers.has(device.id)) peers.get(device.id).ws.close(4000, 'Device reconnected');
           identity = { user, device, ws, token: data.token, alive: () => alive, ping: () => { alive = false; ws.ping(); } };
           peers.set(device.id, identity);
           clearTimeout(authTimer);
@@ -313,13 +318,19 @@ async function createService(options = {}) {
       if (++queued > 200) { ws.close(4008, 'Too many pending messages'); return; }
       serial = serial.then(() => ws.readyState === 1 ? onMessage(raw, binary) : undefined).catch(() => ws.close(1011, 'Service error')).finally(() => { queued--; });
     });
-    ws.on('close', () => {
+    ws.on('close', code => {
       clearTimeout(authTimer);
       if (!identity || peers.get(identity.device.id)?.ws !== ws) return;
       peers.delete(identity.device.id);
       for (const [id, invite] of invites) if (invite.desktop === identity.device.id) invites.delete(id);
       for (const [id, request] of pairRequests) if ([request.desktop, request.controller].includes(identity.device.id)) pairRequests.delete(id);
-      for (const [id, session] of sessions) if ([session.desktop, session.controller].includes(identity.device.id)) finish(id, 'Device disconnected');
+      for (const [id, session] of sessions) {
+        if (![session.desktop, session.controller].includes(identity.device.id)) continue;
+        if (!session.approved || closing || code === 4001) { finish(id, code === 4001 ? 'Signed out' : 'Device disconnected'); continue; }
+        // The peer-to-peer link can outlive the signaling socket. Hold the session briefly for this device to return.
+        clearTimeout(session.awayTimer); session.away = identity.device.id;
+        session.awayTimer = setTimeout(() => finish(id, 'Device disconnected'), sessionGraceMs);
+      }
       if (!closing) broadcast(identity.user.id).catch(() => {});
     });
   });

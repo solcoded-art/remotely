@@ -45,6 +45,7 @@ export class Connection {
   private openingInvite: Invite | null = null;
   private pairCandidate: PairCandidate | null = null;
   private inviteTimer?: ReturnType<typeof setTimeout>;
+  private staleSession = '';
 
   constructor(readonly auth: Auth) {}
   snapshot = () => this.value;
@@ -84,7 +85,8 @@ export class Connection {
   };
   private openSocket() {
     if (this.disposed) return;
-    this.update({ ready: false, status: 'connecting' });
+    // An active session keeps its status while the account socket reconnects underneath it.
+    this.update(this.value.session ? { ready: false } : { ready: false, status: 'connecting' });
     const url = new URL('/ws', this.auth.service); url.protocol = url.protocol === 'https:' ? 'wss:' : 'ws:';
     const ws = new WebSocket(url);
     this.ws = ws;
@@ -98,8 +100,12 @@ export class Connection {
     ws.onerror = () => this.report(Error('Cannot reach the account server. Check the URL and network.'));
     ws.onclose = event => {
       if (this.ws !== ws) return;
-      this.cleanupPeer(); this.clearPairing(); this.connectAttempt = null;
-      this.update({ ready: false, status: 'offline', pending: null, session: null, devices: this.value.devices.map(device => ({ ...device, online: false })) });
+      this.clearPairing(); this.connectAttempt = null;
+      const offline = this.value.devices.map(device => ({ ...device, online: false }));
+      // The peer-to-peer link does not depend on this socket. Keep a live session while it reconnects;
+      // the service holds the session for the same device for a short grace period.
+      if (this.peerAlive() && !this.disposed && ![4000, 4001].includes(event.code)) this.update({ ready: false, pending: null, devices: offline });
+      else { this.cleanupPeer(); this.update({ ready: false, status: 'offline', pending: null, session: null, devices: offline }); }
       if (!this.disposed && ![4000, 4001].includes(event.code)) this.reconnectTimer = setTimeout(() => this.openSocket(), 2000);
       else if (!this.disposed) this.report(Error('Device session closed. Sign in again.'));
     };
@@ -121,7 +127,11 @@ export class Connection {
       this.ws?.send(JSON.stringify({ type: 'hello', token: this.auth.token, deviceId: this.deviceId, signature })); return;
     }
     if (data.type.startsWith('pair') || data.type === 'revoked') { await this.pairMessage(data); return; }
-    if (data.type === 'ready') this.update({ ready: true, status: 'ready', error: '' });
+    if (data.type === 'ready') {
+      if (this.staleSession) { this.send({ type: 'end', sessionId: this.staleSession }); this.staleSession = ''; }
+      if (this.value.session && !this.peerAlive()) this.end();
+      this.update(this.value.session ? { ready: true, error: '' } : { ready: true, status: 'ready', error: '' });
+    }
     if (data.type === 'devices') this.update({ devices: data.devices || [] });
     if (data.type === 'error') { this.connectAttempt = null; this.report(Error(data.message || 'Connection failed.')); if (this.value.session) this.end(); }
     if (data.type === 'pending' || data.type === 'request') {
@@ -428,10 +438,13 @@ export class Connection {
     window.macRemote?.end().catch(() => {});
     this.update({ stream: null, apps: [], route: '', latency: null });
   }
+  /** True while an approved session's peer connection is up or recovering. */
+  private peerAlive() { return !!this.value.session && !!this.pc && ['new', 'connecting', 'connected', 'disconnected'].includes(this.pc.connectionState); }
   end = () => {
     this.connectAttempt = null;
     const id = this.value.session?.id || this.value.pending?.id;
-    if (id && this.ws?.readyState === WebSocket.OPEN) this.send({ type: 'end', sessionId: id });
+    // Ended while the account socket was away: tell the service once it reconnects, so the grace period does not block a new connection.
+    if (id && this.ws?.readyState === WebSocket.OPEN) this.send({ type: 'end', sessionId: id }); else if (id) this.staleSession = id;
     this.cleanupPeer();
     this.update({ session: null, pending: null, status: this.value.ready ? 'ready' : 'offline' });
   };

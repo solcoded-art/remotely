@@ -53,11 +53,11 @@ test('Mac checklist detects missing permission and refreshes after returning fro
     await page.evaluate(() => { (window as any).macTest.permissions = { accessibility: true, screen: 'granted' }; window.dispatchEvent(new Event('focus')); });
     await expect(page.getByText('Ready for a request', { exact: true })).toBeVisible();
     await expectAccessible(page);
-    await page.getByRole('button', { name: 'Account settings' }).click();
+    await page.getByRole('button', { name: 'Settings' }).click();
     await expect(page.getByRole('dialog')).toBeVisible();
     await expectAccessible(page);
     await page.keyboard.press('Escape');
-    await expect(page.getByRole('button', { name: 'Account settings' })).toBeFocused();
+    await expect(page.getByRole('button', { name: 'Settings' })).toBeFocused();
     await page.screenshot({ path: 'artifacts/setup-milestone-mac.png', fullPage: true });
   } finally { await context.close(); }
 });
@@ -80,7 +80,7 @@ test('refresh restores an HttpOnly login and sign-out stays signed out', async (
   expect((await context.cookies()).some(cookie => cookie.name === 'remotely-session' && cookie.httpOnly && cookie.sameSite === 'Lax')).toBe(true);
   expect(await page.evaluate(() => Object.keys(localStorage).filter(key => /token|password|session/i.test(key)))).toEqual([]);
   await page.reload(); await expect(page.getByText('Signed in', { exact: true })).toBeVisible();
-  await page.getByRole('button', { name: 'Account settings' }).click(); await page.getByRole('button', { name: 'Sign out', exact: true }).click();
+  await page.getByRole('button', { name: 'Settings' }).click(); await page.getByRole('button', { name: 'Sign out', exact: true }).click();
   await expect(page.getByRole('heading', { name: 'Welcome back' })).toBeVisible();
   await page.reload(); await expect(page.getByLabel('Email address')).toBeVisible();
   await expect(page.getByLabel('Password', { exact: true })).toHaveCount(0); await expectAccessible(page);

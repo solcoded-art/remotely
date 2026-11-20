@@ -72,7 +72,9 @@ Date: 2026-11-19. These web UI changes use the existing 0.3.1 Mac command protoc
 - `npm run ios:sync`: TypeScript/Vite build and Capacitor asset/plugin sync passed. This is not iOS compilation, signing, installation or TestFlight validation.
 - Browser captures and driver commands remain synthetic/mocked. Physical iPhone keyboard/IME, actual native text insertion and OS/browser fullscreen behavior still require manual device validation. Automated accessibility checks do not establish complete WCAG or ADA compliance.
 
-Live typing is opt-in. Pending browser input is bounded and discarded when video/control access stops; commands already accepted by the Mac cannot be recalled. The screen and app-switch controls wait for queued browser keyboard input to drain. Phone-view fullscreen and the active Mac app's fullscreen shortcut are separate controls.
+The on-screen keyboard sends characters in short batches through one ordered queue: pointer, click and app commands wait behind queued keyboard input, so a click cannot land before earlier text. Pending input is bounded and discarded when video/control access stops or the page is hidden; commands already accepted by the Mac cannot be recalled. Custom shortcuts and trackpad speed are stored on the phone only and validated against the same key-code and modifier limits the Mac driver enforces. Phone-view fullscreen and the active Mac app's fullscreen shortcut are separate controls.
+
+Session persistence: a hidden phone page keeps the session for up to five minutes. If a device's signaling socket drops, the service holds an approved session for 90 seconds (`sessionGraceMs`) for that same device, re-authenticated with its device key, to return; pending requests, sign-out (code 4001), revocation and service shutdown still end sessions immediately. The peer connection itself is not re-negotiated: if the phone's browser suspends WebRTC, the session ends and a new Mac approval is required.
 
 
 ## Persistent login and Better Auth email links

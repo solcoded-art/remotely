@@ -23,7 +23,7 @@ test('native desktop shell boots with isolated renderer and authenticated API ac
     expect(denied).toBe(true);
     await page.reload();
     await expect(page.getByText('Signed in', { exact: true })).toBeVisible({ timeout: 10000 });
-    await page.getByRole('button', { name: 'Account settings' }).click(); await page.getByRole('button', { name: 'Sign out', exact: true }).click();
+    await page.getByRole('button', { name: 'Settings' }).click(); await page.getByRole('button', { name: 'Sign out', exact: true }).click();
     await expect(page.getByLabel('Email address')).toBeVisible();
     await page.reload(); await expect(page.getByLabel('Email address')).toBeVisible();
     await page.screenshot({ path: 'artifacts/desktop-auth-logout.png', fullPage: true });

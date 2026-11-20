@@ -21,25 +21,10 @@ import { clearSession, restoreSession, takeSignInToken } from '@/lib/auth-sessio
 import { request } from '@/lib/api';
 import { Connection } from '@/lib/connection';
 import { MacSetupHelp } from '@/components/MacSetup';
+import { SettingsDialog } from '@/components/SettingsDialog';
 import type { Auth } from '@/lib/types';
 
-function Settings({ auth, logout }: { auth: Auth; logout(): void }) {
-  const [confirmEmail, setConfirmEmail] = useState(''); const [error, setError] = useState(''); const [busy, setBusy] = useState(false); const [confirmDelete, setConfirmDelete] = useState(false);
-  return <Dialog onOpenChange={() => { setConfirmEmail(''); setError(''); setConfirmDelete(false); }}><DialogTrigger asChild><Button variant="ghost" size="icon" aria-label="Account settings"><Settings2 size={17} /></Button></DialogTrigger>
-    <DialogContent><DialogHeader><DialogTitle>Account settings</DialogTitle><DialogDescription>Your account connects your iPhone and Mac.</DialogDescription></DialogHeader>
-      <p className="break-all text-sm">{auth.user.email}</p><p className="break-all text-xs text-muted-foreground">{auth.service}</p>
-      <p className="text-xs leading-6 text-muted-foreground">Stay signed in for up to 30 days. Sign out before someone else uses this device.</p>
-      <DialogClose asChild><Button variant="outline" onClick={logout}><LogOut />Sign out</Button></DialogClose>
-      <div className="border-t border-border pt-4">
-        {!confirmDelete ? <Button variant="ghost" className="text-destructive" onClick={() => setConfirmDelete(true)}>Delete account…</Button> : <form onSubmit={async event => {
-          event.preventDefault(); setBusy(true); setError('');
-          try { await request(auth.service, '/api/account', { token: auth.token, method: 'DELETE', data: { confirmEmail } }); logout(); }
-          catch (error) { setError(error instanceof Error ? error.message : 'Deletion failed.'); } finally { setBusy(false); }
-        }}><p className="mb-3 text-xs leading-6 text-muted-foreground">Permanently delete your account, login sessions, and paired devices. Sign in with a fresh email link (within five minutes), then enter your email to confirm.</p><Input aria-label="Confirm account email" type="email" autoComplete="email" required value={confirmEmail} onChange={event => setConfirmEmail(event.target.value)} />{error && <p role="alert" className="mt-3 text-xs text-destructive">{error}</p>}<Button variant="destructive" className="mt-3 w-full" disabled={busy}>{busy && <Loader2 className="animate-spin" />}Permanently delete account</Button></form>}
-      </div>
-    </DialogContent>
-  </Dialog>;
-}
+const BACKGROUND_LIMIT_MS = 5 * 60_000;
 
 function PhoneSetupSteps() {
   return <Card className="journey-card"><span className="eyebrow">Next, on your phone</span><h2 className="section-title mt-2">Connect in three steps</h2>
@@ -62,24 +47,29 @@ function Workspace({ auth, logout, accountError = '' }: { auth: Auth; logout(): 
   const remoteView = !desktop && !!state.session;
   useEffect(() => { void connection.start(); return () => connection.dispose(); }, [connection]);
   useEffect(() => { heading.current?.focus(); }, [remoteView]);
+  // Locking the phone or switching tabs keeps the session; it ends only after a long absence.
   useEffect(() => {
-    const endOnBackground = () => { if (document.visibilityState === 'hidden' && !connection.desktop && connection.snapshot().session) connection.end(); };
-    document.addEventListener('visibilitychange', endOnBackground);
-    return () => document.removeEventListener('visibilitychange', endOnBackground);
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const changed = () => {
+      clearTimeout(timer);
+      if (document.visibilityState === 'hidden' && !connection.desktop && connection.snapshot().session) timer = setTimeout(() => { if (document.visibilityState === 'hidden') connection.end(); }, BACKGROUND_LIMIT_MS);
+    };
+    document.addEventListener('visibilitychange', changed);
+    return () => { clearTimeout(timer); document.removeEventListener('visibilitychange', changed); };
   }, [connection]);
   const signOut = () => { connection.end(); logout(); };
   const accountLabel = state.ready ? 'Signed in' : state.status === 'connecting' ? 'Connecting account…' : 'Account disconnected';
-  return <AppShell actions={<><span className="account-label muted">{auth.user.email}</span>{!desktop && <MacSetupHelp />}<Settings auth={auth} logout={signOut} /></>}>
+  return <AppShell actions={<><span className="account-label muted">{auth.user.email}</span>{!desktop && <MacSetupHelp />}<SettingsDialog auth={auth} logout={signOut} /></>}>
     <main className={`page ${remoteView ? 'remote-main' : ''}`} id="main-content" tabIndex={-1}>
-      <div className="page-heading"><div className="min-w-0"><div className="eyebrow">{desktop ? 'Mac app' : remoteView ? 'Remote workspace' : 'Your personal workspace'}</div><h1 ref={heading} tabIndex={-1} className="page-title">{remoteView ? state.session?.name : desktop ? 'Get your Mac ready.' : 'Your Mac, a little closer.'}</h1><p className="text-base leading-7 text-muted-foreground">{remoteView ? 'Your apps and your editor, right where you left them.' : desktop ? 'Finish setup, then approve your phone’s connection here.' : 'Choose a Mac to request screen sharing and control.'}</p></div><div role="status" aria-atomic="true"><Badge variant="outline" className="account-badge"><span className={`status-dot ${state.ready ? 'online' : ''}`} aria-hidden="true" />{accountLabel}</Badge></div></div>
+      <div className={`page-heading ${remoteView ? 'sr-only' : ''}`}><div className="min-w-0"><h1 ref={heading} tabIndex={-1} className="page-title">{remoteView ? state.session?.name : desktop ? 'Get your Mac ready.' : 'Your Mac, a little closer.'}</h1></div>{!remoteView && <div role="status" aria-atomic="true"><Badge variant="outline" className="account-badge"><span className={`status-dot ${state.ready ? 'online' : ''}`} aria-hidden="true" />{accountLabel}</Badge></div>}</div>
       {accountError && <StatusNotice title="Account needs attention" error>{accountError}</StatusNotice>}
       {state.error && <StatusNotice title="Something needs attention" error dismiss={connection.clearError}>{state.error}</StatusNotice>}
       {!state.ready && state.status === 'offline' && <StatusNotice title="Account connection interrupted"><p>Your desktop session has stopped. Check your network, retry, or sign in again.</p><div className="setup-actions"><Button variant="outline" onClick={connection.retry}>Retry connection</Button><Button variant="ghost" onClick={signOut}>Sign out</Button></div></StatusNotice>}
       {state.pending && desktop && <Card className="approval-card" aria-labelledby="approval-title"><div role="status" aria-atomic="true" className="flex items-start gap-3"><Smartphone className="text-primary" aria-hidden="true" /><div><h2 id="approval-title" className="text-lg font-medium">{state.pending.name} wants to connect</h2><p className="mt-1 text-sm leading-6 text-muted-foreground">Paired with this Mac using its device key. Allowing this request shares your selected display and enables mouse and keyboard control.</p></div></div>{!desktopReady && <p className="text-sm text-muted-foreground">Complete the Mac setup checklist below before allowing this request.</p>}<div className="setup-actions"><Button disabled={approving || !desktopReady} onClick={async () => { setApproving(true); try { await connection.approve(); } finally { setApproving(false); } }}>{approving && <Loader2 className="animate-spin" aria-hidden="true" />}Allow connection</Button><Button variant="outline" disabled={approving} onClick={connection.decline}>Decline</Button></div></Card>}
       {remoteView ? <RemoteSession key={state.session!.id} connection={connection} state={state} /> : <div className={`dashboard-grid ${desktop ? '' : 'devices-only'}`}><div className="min-w-0">
-        {desktop ? <><DevicePairing connection={connection} state={state} /><DesktopSetup accountReady={state.ready} busy={!!state.session} onReadyChange={setDesktopReady} />{state.session && <Card className="journey-card mt-5"><div className="session-actions"><p>{state.session.name} · {connected ? 'Connected' : 'Connecting…'}</p><Button variant="destructive" onClick={connection.end}>End session</Button></div><Viewer connection={connection} stream={state.stream} connected={connected} desktop /></Card>}</> : <>{!!Object.keys(state.pins).length && <DevicesPanel devices={state.devices} ready={state.ready} pins={state.pins} connect={connection.connect} />}<DevicePairing key="device-pairing" connection={connection} state={state} />{!Object.keys(state.pins).length && <DevicesPanel devices={state.devices} ready={state.ready} pins={state.pins} connect={connection.connect} />}</>}
+        {desktop ? <><DevicePairing connection={connection} state={state} /><DesktopSetup accountReady={state.ready} busy={!!state.session} onReadyChange={setDesktopReady} />{state.session && <Card className="journey-card mt-5"><div className="session-actions"><p>{state.session.name} · {connected ? 'Connected' : 'Connecting…'}</p><Button variant="destructive" onClick={connection.end}>End session</Button></div><Viewer connection={connection} stream={state.stream} desktop /></Card>}</> : <>{!!Object.keys(state.pins).length && <DevicesPanel devices={state.devices} ready={state.ready} pins={state.pins} connect={connection.connect} />}<DevicePairing key="device-pairing" connection={connection} state={state} />{!Object.keys(state.pins).length && <DevicesPanel devices={state.devices} ready={state.ready} pins={state.pins} connect={connection.connect} />}</>}
       </div>{desktop && <PhoneSetupSteps />}</div>}
-      <p className="connection-footer"><Globe2 size={16} aria-hidden="true" /><span>Your Mac approves every connection.{!desktop && ' Keep this page in the foreground during a session.'}</span></p>
+      {!remoteView && <p className="connection-footer"><Globe2 size={16} aria-hidden="true" /><span>Your Mac approves every connection.</span></p>}
     </main>
   </AppShell>;
 }

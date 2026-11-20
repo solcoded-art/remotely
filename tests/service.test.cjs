@@ -17,7 +17,7 @@ async function fixture(t, options = {}) {
   await admin.query(`CREATE DATABASE ${name}`);
   const databaseURL = new URL(process.env.TEST_DATABASE_URL); databaseURL.pathname = '/' + name;
   const mails = [];
-  const authOptions = { publicURL: 'http://127.0.0.1:3000', authSecret: randomBytes(48).toString('base64url'), sendMail: async mail => { mails.push(mail); }, ...options };
+  const authOptions = { publicURL: 'http://127.0.0.1:3000', authSecret: randomBytes(48).toString('base64url'), sendMail: async mail => { mails.push(mail); }, sessionGraceMs: 300, ...options };
   let service;
   try { service = await createService({ ...authOptions, databaseURL: databaseURL.toString() }); }
   catch (error) { await admin.query(`DROP DATABASE ${name}`); await admin.end(); throw error; }
@@ -142,7 +142,15 @@ test('signaling requires matching ownership and explicit desktop approval', asyn
   desktop.send({ type: 'signal', sessionId: pending.sessionId, signal, seq: 1, signature: signature(desktop.key, trust.signalText(pending.sessionId, grant.id, mac.id, 1, signal, desktop.binding(pending.sessionId))) });
   assert.equal((await ios.next('signal')).signal.sdp, 'test-sdp');
   outsider.send({ type: 'signal', sessionId: pending.sessionId, signal: { type: 'ice', candidate: {} } }); assert.match((await outsider.next('error')).message, /unavailable/);
-  ios.ws.close(); assert.equal((await desktop.next('ended')).reason, 'Device disconnected');
+  // A dropped phone socket keeps the approved session for the grace period and resumes on reconnect.
+  ios.ws.close();
+  const back = await socket(owner.token, phone.id);
+  await new Promise(resolve => setTimeout(resolve, 500));
+  const resumed = { type: 'ice', candidate: { candidate: 'resumed' } };
+  desktop.send({ type: 'signal', sessionId: pending.sessionId, signal: resumed, seq: 2, signature: signature(desktop.key, trust.signalText(pending.sessionId, grant.id, mac.id, 2, resumed, desktop.binding(pending.sessionId))) });
+  assert.equal((await back.next('signal')).signal.candidate.candidate, 'resumed');
+  // Staying away past the grace period ends it.
+  back.ws.close(); assert.equal((await desktop.next('ended')).reason, 'Device disconnected');
 });
 
 test('hostile origins are rejected and account deletion removes sessions and devices', async t => {
