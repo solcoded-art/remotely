@@ -3033,19 +3033,22 @@ checksum = "c41e0c4fef86961ac6d6f8a82609f55f31b05e4fce149ac5710e439df7619ba4"
 
 [[package]]
 name = "mac-remote-gpui"
-version = "0.1.0"
+version = "0.4.0"
 dependencies = [
+ "aes",
  "anyhow",
  "async-channel 2.5.0",
  "async-trait",
  "base64 0.22.1",
  "bytes",
+ "cbc",
  "core-foundation 0.10.0",
  "core-video",
  "gpui",
  "hmac",
  "objc",
  "p256",
+ "pbkdf2",
  "qrcode",
  "rand_core 0.6.4",
  "rtc",
@@ -3053,6 +3056,7 @@ dependencies = [
  "security-framework",
  "serde",
  "serde_json",
+ "sha1",
  "sha2 0.10.9",
  "tokio",
  "tungstenite",

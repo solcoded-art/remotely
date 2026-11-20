@@ -9,16 +9,19 @@ mod driver;
 mod encoder;
 #[cfg(feature = "e2e")]
 mod e2e;
+mod electron;
 mod log;
 mod identity;
 mod peer;
 mod platform;
 mod qr;
+mod remember;
 mod signaling;
 mod store;
 mod text_input;
 mod theme;
 mod trust;
+mod update;
 mod vault;
 
 use gpui::{actions, prelude::*, px, size, App, Application, Bounds, KeyBinding, Menu, MenuItem, TitlebarOptions, WindowBounds, WindowOptions};

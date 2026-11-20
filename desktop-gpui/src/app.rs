@@ -53,6 +53,12 @@ pub struct MacRemote {
     /// Phone awaiting revoke confirmation.
     revoke_id: Option<String>,
     copy_status: String,
+    /// "Skip approval for" choice on the current request, and which request it belongs to.
+    remember_ms: i64,
+    remember_request: String,
+    update: Option<crate::update::Update>,
+    update_dismissed: String,
+    update_task: Option<Task<()>>,
     /// e2e builds only: synthetic capture for the test harness.
     test_mode: bool,
     account_error: Option<String>,
@@ -112,10 +118,16 @@ impl MacRemote {
             connection_subscription: None,
             revoke_id: None,
             copy_status: String::new(),
+            remember_ms: 0,
+            remember_request: String::new(),
+            update: None,
+            update_dismissed: store::dismissed_update(),
+            update_task: None,
             test_mode: false,
             account_error: None,
             _subscriptions: subscriptions,
         };
+        this.watch_updates(cx);
         #[cfg(feature = "e2e")]
         if let Some(config) = crate::e2e::config() {
             this.test_mode = true;
@@ -328,6 +340,10 @@ impl MacRemote {
     fn sign_out(&mut self, cx: &mut Context<Self>) {
         let Some(auth) = self.auth.clone() else { return };
         self.busy = true;
+        // Signing out stops skipping approval for every phone, as in the Electron app.
+        if let Some(connection) = &self.connection {
+            connection.update(cx, |c, _| c.forget_remembered(None));
+        }
         self.close_connection(cx);
         cx.notify();
         cx.spawn(async move |this, cx| {
@@ -619,7 +635,13 @@ impl MacRemote {
         let Some(pending) = state.desktop.pending.clone() else { return div() };
         let ready = state.setup_ready();
         let approving = state.desktop.approving;
+        if pending.unlocked {
+            return card().border_color(theme::accent()).child(div().text_size(px(18.)).font_weight(FontWeight::MEDIUM).child(format!("{} is reconnecting", pending.name))).child(hint(
+                "It proved a fresh unlock with its passkey, so this Mac is allowing it without asking.",
+            ));
+        }
         let (allow, decline) = (connection.clone(), connection.clone());
+        let choice = pending.can_remember.then(|| self.render_remember_choice(&pending.id, "card", cx));
         let mut panel = card()
             .border_color(theme::accent())
             .child(div().text_size(px(18.)).font_weight(FontWeight::MEDIUM).child(format!("{} wants to connect", pending.name)))
@@ -630,19 +652,42 @@ impl MacRemote {
             panel = panel.child(hint("Complete the Mac setup checklist below before allowing this request."));
         }
         let can_allow = ready && !approving;
-        panel.child(
+        panel.when_some(choice, |panel, choice| panel.child(choice)).child(
             div()
                 .flex()
                 .gap_2()
                 .child(
-                    button("allow-connection", if approving { "Allowing…" } else { "Allow connection" }, Style::Primary, !can_allow)
-                        .when(can_allow, |b| b.on_click(move |_, _, cx| allow.update(cx, |c, cx| c.approve(cx)))),
+                    button("allow-connection", if approving { "Allowing…" } else { "Allow connection" }, Style::Primary, !can_allow).when(can_allow, |b| {
+                        b.on_click(cx.listener(move |this, _, _, cx| {
+                            let ms = this.remember_ms;
+                            allow.update(cx, |c, cx| c.approve(ms, cx));
+                        }))
+                    }),
                 )
                 .child(
                     button("decline-connection", "Decline", Style::Outline, approving)
                         .when(!approving, |b| b.on_click(move |_, _, cx| decline.update(cx, |c, cx| c.decline(cx)))),
                 ),
         )
+    }
+
+    /// "Skip approval for": how long this phone may reconnect without asking (≤ 3 days).
+    fn render_remember_choice(&mut self, request_id: &str, place: &'static str, cx: &mut Context<Self>) -> Div {
+        if self.remember_request != request_id {
+            self.remember_request = request_id.to_string();
+            self.remember_ms = 0;
+        }
+        let mut row = div().flex().flex_wrap().items_center().gap_2().child(div().text_sm().text_color(theme::muted()).child("Skip approval for"));
+        for (label, ms) in crate::remember::OPTIONS {
+            let selected = self.remember_ms == ms;
+            row = row.child(
+                button(SharedString::from(format!("remember-{place}-{ms}")), label, if selected { Style::Primary } else { Style::Outline }, false).h(px(30.)).px_3().on_click(cx.listener(move |this, _, _, cx| {
+                    this.remember_ms = ms;
+                    cx.notify();
+                })),
+            );
+        }
+        row
     }
 
     /// The active session with End session.
@@ -865,14 +910,33 @@ impl MacRemote {
                                     .flex_col()
                                     .min_w_0()
                                     .child(div().text_sm().child(pin.name.clone()))
+                                    .when_some(remembered_text(state.desktop.remembered.get(&id).filter(|r| r.grant_id == pin.grant_id)), |col, text| {
+                                        col.child(div().text_xs().text_color(theme::success()).child(text))
+                                    })
                                     .child(div().text_xs().text_color(theme::muted()).child(format!("Device key {}", &id[2..]))),
                             )
                             .when(!confirming, |row| {
                                 let id = id.clone();
-                                row.child(button(SharedString::from(format!("revoke-{id}")), "Revoke", Style::Outline, false).on_click(cx.listener(move |this, _, _, cx| {
-                                    this.revoke_id = Some(id.clone());
-                                    cx.notify();
-                                })))
+                                let remembered = state.desktop.remembered.get(&id).is_some_and(|r| r.grant_id == pin.grant_id);
+                                let forget = connection.clone();
+                                let forget_id = id.clone();
+                                row.child(
+                                    div()
+                                        .flex()
+                                        .gap_2()
+                                        .when(remembered, |actions| {
+                                            actions.child(button(SharedString::from(format!("forget-{id}")), "Forget", Style::Outline, false).on_click(move |_, _, cx| {
+                                                forget.update(cx, |c, cx| {
+                                                    c.forget_remembered(Some(&forget_id));
+                                                    cx.notify();
+                                                })
+                                            }))
+                                        })
+                                        .child(button(SharedString::from(format!("revoke-{id}")), "Revoke", Style::Outline, false).on_click(cx.listener(move |this, _, _, cx| {
+                                            this.revoke_id = Some(id.clone());
+                                            cx.notify();
+                                        }))),
+                                )
                             }),
                     );
                 if confirming {
@@ -928,6 +992,7 @@ impl Render for MacRemote {
             Screen::Workspace => self.render_workspace(cx),
         };
         let toast = matches!(self.screen, Screen::Workspace).then(|| self.render_toast(cx)).flatten();
+        let update = self.render_update(cx);
         div()
             .relative()
             .size_full()
@@ -937,15 +1002,110 @@ impl Render for MacRemote {
             .font_family(".SystemUIFont")
             .child(content)
             .when_some(toast, |root, toast| root.child(toast))
+            .when_some(update, |root, update| root.child(update))
     }
 }
 
 impl MacRemote {
+    /// Checks the account service for a newer release at launch and every 6 hours.
+    fn watch_updates(&mut self, cx: &mut Context<Self>) {
+        self.update_task = Some(cx.spawn(async move |this, cx| loop {
+            let service = this
+                .read_with(cx, |this, cx| this.auth.as_ref().map(|a| a.service.clone()).or_else(|| account::service_url(&this.server.read(cx).text()).ok()))
+                .ok()
+                .flatten();
+            if let Some(service) = service {
+                let result = cx.background_executor().spawn(async move { crate::update::check(&service) }).await;
+                // Offline or unavailable: keep what we had and try again later.
+                if let Ok(update) = result {
+                    if this.update(cx, |this, cx| {
+                        if update.as_ref().is_some_and(|u| this.update.as_ref() != Some(u)) {
+                            crate::log::log(format!("update available: {}", update.as_ref().map(|u| u.latest.as_str()).unwrap_or_default()));
+                        }
+                        this.update = update;
+                        cx.notify();
+                    })
+                    .is_err()
+                    {
+                        break;
+                    }
+                }
+            }
+            cx.background_executor().timer(crate::update::CHECK_EVERY).await;
+        }));
+    }
+
+    /// "Update available" card, or a blocking dialog when this version is no longer supported.
+    fn render_update(&mut self, cx: &mut Context<Self>) -> Option<AnyElement> {
+        let update = self.update.clone()?;
+        if !update.required && self.update_dismissed == update.latest {
+            return None;
+        }
+        let page = crate::update::download_page(&update.service)?;
+        let actions = div()
+            .flex()
+            .gap_2()
+            .child(button("update-download", "Download update", Style::Primary, false).on_click(move |_, _, cx| cx.open_url(&page)))
+            .when(!update.required, |row| {
+                let latest = update.latest.clone();
+                row.child(button("update-later", "Later", Style::Outline, false).on_click(cx.listener(move |this, _, _, cx| {
+                    store::dismiss_update(&latest);
+                    this.update_dismissed = latest.clone();
+                    cx.notify();
+                })))
+            });
+        let panel = div().flex().flex_col().gap_3().p_5().rounded_lg().border_1().bg(theme::card()).shadow_lg();
+        Some(if update.required {
+            div()
+                .absolute()
+                .inset_0()
+                .flex()
+                .items_center()
+                .justify_center()
+                .bg(gpui::rgba(0x000000b3))
+                .occlude()
+                .child(
+                    panel
+                        .w(px(440.))
+                        .border_color(theme::danger())
+                        .child(div().text_size(px(18.)).font_weight(FontWeight::SEMIBOLD).child("Update required"))
+                        .child(div().text_sm().text_color(theme::muted()).child(format!(
+                            "This version of Mac Remote ({}) is no longer supported. Download version {}, then replace the app in Applications and reopen it.",
+                            crate::update::CURRENT, update.latest
+                        )))
+                        .child(actions),
+                )
+                .into_any_element()
+        } else {
+            div()
+                .absolute()
+                .bottom(px(24.))
+                .right(px(24.))
+                .w(px(340.))
+                .child(
+                    panel
+                        .border_color(theme::accent())
+                        .child(eyebrow("Update available"))
+                        .child(div().text_size(px(16.)).font_weight(FontWeight::MEDIUM).child(format!("Mac Remote {} is ready", update.latest)))
+                        .child(hint("Download it, replace the app in Applications, and reopen it. Your sign-in and paired phones are kept."))
+                        .child(actions),
+                )
+                .into_any_element()
+        })
+    }
+
     /// Pairing and connection requests float over the window, wherever it is scrolled.
     fn render_toast(&mut self, cx: &mut Context<Self>) -> Option<AnyElement> {
         let connection = self.connection.clone()?;
         let state = connection.read(cx);
+        let mut choice = None;
         let (title, body, allow_label, busy, kind) = if let Some(pending) = state.desktop.pending.clone() {
+            if pending.unlocked {
+                return None;
+            }
+            if pending.can_remember {
+                choice = Some(pending.id.clone());
+            }
             let ready = state.setup_ready();
             (
                 format!("{} wants to connect", pending.name),
@@ -967,6 +1127,7 @@ impl MacRemote {
         };
         let (allow, decline) = (connection.clone(), connection.clone());
         let pairing = kind == "pairing";
+        let choice = choice.map(|id| self.render_remember_choice(&id, "toast", cx));
         Some(
             div()
                 .absolute()
@@ -985,12 +1146,16 @@ impl MacRemote {
                 .child(eyebrow(if pairing { "Pairing request" } else { "Connection request" }))
                 .child(div().text_size(px(16.)).font_weight(FontWeight::MEDIUM).child(title))
                 .child(div().text_sm().text_color(theme::muted()).child(body))
+                .when_some(choice, |toast, choice| toast.child(choice))
                 .child(
                     div()
                         .flex()
                         .gap_2()
                         .child(button("toast-allow", allow_label, Style::Primary, busy).when(!busy, |b| {
-                            b.on_click(move |_, _, cx| allow.update(cx, |c, cx| if pairing { c.approve_pair(cx) } else { c.approve(cx) }))
+                            b.on_click(cx.listener(move |this, _, _, cx| {
+                                let ms = this.remember_ms;
+                                allow.update(cx, |c, cx| if pairing { c.approve_pair(cx) } else { c.approve(ms, cx) })
+                            }))
                         }))
                         .child(button("toast-decline", "Decline", Style::Outline, false).on_click(move |_, _, cx| {
                             decline.update(cx, |c, cx| if pairing { c.decline_pair(cx) } else { c.decline(cx) })
@@ -1115,6 +1280,16 @@ fn header(actions: Div) -> Div {
         .border_color(theme::border())
         .child(div().text_size(px(16.)).font_weight(FontWeight::SEMIBOLD).child("Remotely"))
         .child(actions)
+}
+
+/// "Skips approval for 2 more days", from a remembered record.
+fn remembered_text(record: Option<&crate::remember::RememberedPhone>) -> Option<String> {
+    let left = record?.until - store::now_ms();
+    if left <= 0 {
+        return None;
+    }
+    let hours = (left + 3_599_999) / 3_600_000;
+    Some(if hours > 24 { format!("Skips approval for {} more days", (hours + 23) / 24) } else if hours == 1 { "Skips approval for 1 more hour".into() } else { format!("Skips approval for {hours} more hours") })
 }
 
 fn device_row(device: &Device, this_mac: bool) -> Div {

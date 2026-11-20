@@ -8,6 +8,7 @@
 //! command reaches the driver until the person clicks Allow connection.
 
 use std::{
+    collections::{BTreeMap, HashMap},
     ffi::c_void,
     rc::Rc,
     sync::{
@@ -29,7 +30,10 @@ use crate::{
     driver::{Driver, DriverEvent},
     encoder::{fit, Encoder},
     peer::{self, Peer, PeerEvent, VideoSink},
-    platform, trust,
+    platform,
+    remember::{self, RememberedPhone, Unlock},
+    store::now_ms,
+    trust,
 };
 
 const NEGOTIATION_TIMEOUT: Duration = Duration::from_secs(25);
@@ -43,6 +47,19 @@ pub struct Session {
     pub grant_id: String,
     controller_nonce: String,
     desktop_nonce: Option<String>,
+    /// The phone can prove a device unlock, so the Mac may offer to remember it.
+    pub can_remember: bool,
+    /// The Mac verified a remembered phone's unlock and is approving on its own.
+    pub unlocked: bool,
+}
+
+/// The remembered window chosen at approval, waiting for the phone's passkey.
+struct RememberPlan {
+    session_id: String,
+    controller_id: String,
+    grant_id: String,
+    until: i64,
+    challenge: String,
 }
 
 #[derive(Clone, Copy, PartialEq)]
@@ -89,6 +106,13 @@ pub struct Desktop {
     window_start: Option<Instant>,
     window_count: u32,
     negotiation_task: Option<Task<()>>,
+    /// Phones that may reconnect without a prompt (controller id → record).
+    pub remembered: BTreeMap<String, RememberedPhone>,
+    /// Unlock proofs are single use: controller nonce → expiry.
+    used_unlocks: HashMap<String, i64>,
+    remember_plan: Option<RememberPlan>,
+    /// The window picked on the prompt for the approval in progress.
+    approving_remember_ms: i64,
 }
 
 impl Connection {
@@ -212,7 +236,7 @@ impl Connection {
     // ---------- Requests and approval ----------
 
     /// A paired phone asks to connect: check the pin and its signed request.
-    pub(super) fn session_request(&mut self, data: &Value, _cx: &mut Context<Self>) -> Result<()> {
+    pub(super) fn session_request(&mut self, data: &Value, cx: &mut Context<Self>) -> Result<()> {
         let session_id = s(data, "sessionId").to_string();
         let peer_id = s(data, "peerId").to_string();
         let nonce = s(data, "controllerNonce").to_string();
@@ -229,21 +253,115 @@ impl Connection {
             bail!("The phone did not prove this connection request.");
         }
         crate::log::log(format!("connection request from {} (verified)", pin.name));
-        self.desktop.pending = Some(Session { id: session_id, name: pin.name, peer_id, grant_id: pin.grant_id, controller_nonce: nonce, desktop_nonce: None });
+        let session = Session {
+            id: session_id,
+            name: pin.name,
+            peer_id,
+            grant_id: pin.grant_id,
+            controller_nonce: nonce,
+            desktop_nonce: None,
+            can_remember: data.get("canRemember") == Some(&Value::Bool(true)),
+            unlocked: false,
+        };
+        self.error = None;
+        if self.verified_unlock(&session, data.get("unlock")) {
+            crate::log::log(format!("{} proved a fresh unlock: approving without a prompt", session.name));
+            self.desktop.pending = Some(Session { unlocked: true, ..session });
+            self.approve(0, cx);
+            return Ok(());
+        }
+        self.desktop.pending = Some(session);
         if !self.desktop.test_mode {
             platform::request_attention();
         }
-        self.error = None;
         Ok(())
     }
 
+    /// A remembered phone's unlock proof for this request. Each proof works once, and
+    /// only while the setup checklist is complete.
+    fn verified_unlock(&mut self, session: &Session, unlock: Option<&Value>) -> bool {
+        let Some(unlock) = unlock.and_then(Unlock::parse) else { return false };
+        if !self.setup_ready() {
+            return false;
+        }
+        let now = now_ms();
+        self.desktop.used_unlocks.retain(|_, expires| *expires > now);
+        let Some(record) = self.desktop.remembered.get(&session.peer_id).filter(|r| r.grant_id == session.grant_id && r.until > now).cloned() else { return false };
+        if unlock.credential_id != record.credential_id || self.desktop.used_unlocks.contains_key(&session.controller_nonce) {
+            return false;
+        }
+        let challenge = trust::b64(remember::unlock_text(&self.auth.user.id, &self.device_id, &session.peer_id, &session.controller_nonce).as_bytes());
+        if !remember::verify_unlock(&record.public_key, &unlock, &challenge, &record.origin) {
+            crate::log::log("remembered unlock did not verify: asking instead");
+            return false;
+        }
+        self.desktop.used_unlocks.insert(session.controller_nonce.clone(), record.until);
+        true
+    }
+
+    /// Stops skipping approval for one phone, or every phone (sign-out).
+    pub fn forget_remembered(&mut self, controller_id: Option<&str>) {
+        let before = self.desktop.remembered.len();
+        match controller_id {
+            Some(id) => {
+                self.desktop.remembered.remove(id);
+            }
+            None => self.desktop.remembered.clear(),
+        }
+        if self.desktop.remembered.len() != before {
+            self.save_remembered();
+        }
+    }
+
+    pub(super) fn forget_remembered_grant(&mut self, grant_id: &str) {
+        let before = self.desktop.remembered.len();
+        self.desktop.remembered.retain(|_, r| r.grant_id != grant_id);
+        if self.desktop.remembered.len() != before {
+            self.save_remembered();
+        }
+    }
+
+    fn save_remembered(&mut self) {
+        if let Err(err) = remember::save(&account::storage_service(&self.auth.service), &self.auth.user.id, &self.desktop.remembered) {
+            self.error = Some(err.to_string());
+        }
+    }
+
+    /// The phone answered the Mac's offer with its passkey: record it for the chosen window.
+    fn remember_key(&mut self, key: Value) {
+        let Some(plan) = self.desktop.remember_plan.take() else { return };
+        let session = self.desktop.session.clone();
+        if session.as_ref().is_none_or(|s| s.id != plan.session_id || s.peer_id != plan.controller_id) {
+            return;
+        }
+        let Some(origin) = remember::verify_unlock_key(&key, &plan.challenge) else {
+            crate::log::log("remember: the phone's passkey did not verify");
+            self.send_data(&json!({ "action": "error", "error": "The Mac could not verify this phone’s unlock. Approval is still required." }));
+            return;
+        };
+        let until = plan.until.min(now_ms() + remember::REMEMBER_MAX_MS);
+        let record = RememberedPhone {
+            grant_id: plan.grant_id,
+            credential_id: s(&key, "credentialId").to_string(),
+            public_key: s(&key, "publicKey").to_string(),
+            origin,
+            until,
+        };
+        self.desktop.remembered.insert(plan.controller_id, record);
+        self.save_remembered();
+        crate::log::log("remember: phone's passkey recorded");
+        self.send_data(&json!({ "action": "remember-set", "until": until }));
+    }
+
     /// Allow connection: sign the approval, start capture, then tell the service.
-    pub fn approve(&mut self, cx: &mut Context<Self>) {
+    /// `remember_ms` lets this phone reconnect without a prompt for that long (3 days at most).
+    pub fn approve(&mut self, remember_ms: i64, cx: &mut Context<Self>) {
         let Some(pending) = self.desktop.pending.clone() else { return };
         if self.desktop.approving {
             return;
         }
         self.desktop.approving = true;
+        self.desktop.approving_remember_ms = remember_ms;
         cx.notify();
         let prepared = (|| -> Result<(String, String, DisplayInfo)> {
             let pin = self.pins.get(&pending.peer_id).filter(|p| p.grant_id == pending.grant_id).ok_or_else(|| anyhow!("Device trust was revoked. Pair again before connecting."))?;
@@ -344,7 +462,17 @@ impl Connection {
         let result = self.send(json!({ "type": "approve", "sessionId": id, "allowed": true, "desktopNonce": nonce, "approvalSignature": signature }));
         if let Err(err) = result {
             self.fail_approval(id, "capture", err.to_string(), cx);
+            return;
         }
+        // A remembered window starts at this approval. Reconnects within it never extend it.
+        let ms = self.desktop.approving_remember_ms;
+        self.desktop.remember_plan = self.desktop.pending.as_ref().filter(|p| ms > 0 && p.can_remember && !p.unlocked && p.id == id).map(|p| RememberPlan {
+            session_id: p.id.clone(),
+            controller_id: p.peer_id.clone(),
+            grant_id: p.grant_id.clone(),
+            until: now_ms() + ms.min(remember::REMEMBER_MAX_MS),
+            challenge: trust::nonce(),
+        });
         cx.notify();
     }
 
@@ -480,6 +608,10 @@ impl Connection {
                 self.desktop.negotiation_task = None;
                 self.desktop.session_status = Some(SessionStatus::Connected);
                 self.error = None;
+                let offer = self.desktop.remember_plan.as_ref().filter(|p| self.desktop.session.as_ref().is_some_and(|s| s.id == p.session_id)).map(|p| json!({ "action": "remember-offer", "until": p.until, "challenge": p.challenge }));
+                if let Some(offer) = offer {
+                    self.send_data(&offer);
+                }
                 if let Some(encoder) = &self.desktop.encoder {
                     encoder.request_keyframe();
                 }
@@ -543,8 +675,9 @@ impl Connection {
             self.report("Invalid control message.", cx);
             return;
         };
-        // Remembered approval is between the two apps and never reaches the driver (milestone 4).
+        // Remembering is between the two apps; it never reaches the input driver.
         if s(&command, "action") == "remember-key" {
+            self.remember_key(command);
             return;
         }
         let result = validate_command(&command).and_then(|valid| {
@@ -640,6 +773,7 @@ impl Connection {
         d.peer_state = None;
         d.session_status = None;
         d.approving = false;
+        d.remember_plan = None;
         d.signal_seq = 0;
         d.remote_seq = 0;
         if let Some(driver) = &d.driver {

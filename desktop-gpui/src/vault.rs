@@ -33,6 +33,9 @@ pub struct Record {
     /// User id → `{ key, pins }` (see identity.rs).
     #[serde(default)]
     pub identities: BTreeMap<String, Value>,
+    /// Other per-user data, e.g. `remembered:<user>` (remember.rs).
+    #[serde(default)]
+    pub extra: BTreeMap<String, Value>,
 }
 
 struct Cached {

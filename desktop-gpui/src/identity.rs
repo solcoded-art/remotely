@@ -104,7 +104,13 @@ fn migrate(storage_service: &str, user_id: &str, vault_record: &mut vault::Recor
         return Ok(false);
     }
     let scope = serde_json::to_string(&[storage_service, user_id])?;
-    let Some(bytes) = vault::legacy(LEGACY_SERVICE, &hex(&Sha256::digest(scope.as_bytes())))? else { return Ok(false) };
+    let Some(bytes) = vault::legacy(LEGACY_SERVICE, &hex(&Sha256::digest(scope.as_bytes())))? else {
+        // No earlier GPUI build: bring over the Electron app's key, if it had one.
+        let Some(value) = crate::electron::device_record(storage_service, user_id)? else { return Ok(false) };
+        serde_json::from_value::<Record>(value.clone()).map_err(|_| anyhow!(UNREADABLE))?;
+        vault_record.identities.insert(user_id.to_string(), value);
+        return Ok(true);
+    };
     let record = serde_json::from_slice::<Record>(&bytes).map_err(|_| anyhow!(UNREADABLE))?;
     vault_record.identities.insert(user_id.to_string(), serde_json::to_value(record)?);
     Ok(true)

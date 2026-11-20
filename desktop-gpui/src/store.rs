@@ -45,7 +45,12 @@ fn migrate_session(account: &str, record: &mut vault::Record) -> Result<bool> {
     if record.session.is_some() {
         return Ok(false);
     }
-    let Ok(Some(bytes)) = vault::legacy(LEGACY_SESSION_SERVICE, account) else { return Ok(false) };
+    let Ok(Some(bytes)) = vault::legacy(LEGACY_SESSION_SERVICE, account) else {
+        // Signed in with the Electron app before? Keep that sign-in.
+        let Some(value) = crate::electron::session(account) else { return Ok(false) };
+        record.session = Some(value);
+        return Ok(true);
+    };
     Ok(match serde_json::from_slice::<Value>(&bytes) {
         Ok(value) => {
             record.session = Some(value);
@@ -95,6 +100,18 @@ pub fn clear_session(origin: &str) -> Result<()> {
 
 fn preferences_dir() -> Option<PathBuf> {
     std::env::var_os("HOME").map(|home| PathBuf::from(home).join("Library/Application Support/Mac Remote GPUI"))
+}
+
+/// The release version whose update prompt was dismissed with Later.
+pub fn dismissed_update() -> String {
+    preferences_dir().and_then(|dir| fs::read_to_string(dir.join("update-dismissed")).ok()).unwrap_or_default().trim().to_string()
+}
+
+pub fn dismiss_update(version: &str) {
+    if let Some(dir) = preferences_dir() {
+        let _ = fs::create_dir_all(&dir);
+        let _ = fs::write(dir.join("update-dismissed"), version);
+    }
 }
 
 /// The last account server used, or None for the default.

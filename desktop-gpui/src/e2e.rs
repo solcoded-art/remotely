@@ -4,7 +4,7 @@
 //!   env MAC_REMOTE_E2E_SERVER=http://127.0.0.1:<port>  (loopback only)
 //!   env MAC_REMOTE_E2E_TOKEN=<session token>           (used instead of the Keychain login)
 //!   stdin:  `invite` | `approve` | `decline` | `revoke <peerId>` | `displays` | `select <id>`
-//!           | `allow` | `deny` | `end` | `quit`
+//!           | `allow [rememberMs]` | `deny` | `end` | `forget <peerId>` | `quit`
 //!   stdout: one JSON state line per change, prefixed `E2E `.
 
 use std::io::BufRead;
@@ -50,6 +50,8 @@ pub fn attach(view: Entity<MacRemote>, cx: &mut App) {
             "pairing": c.pairing.as_ref().map(|p| p.peer_id.clone()),
             "pairStatus": c.pair_status,
             "setupReady": c.setup_ready(),
+            "remembered": c.desktop.remembered.keys().cloned().collect::<Vec<_>>(),
+            "unlocked": c.desktop.pending.as_ref().is_some_and(|p| p.unlocked),
             "displays": c.desktop.displays.iter().map(|d| d.id).collect::<Vec<_>>(),
             "pending": c.desktop.pending.as_ref().map(|p| p.peer_id.clone()),
             "session": c.desktop.session.as_ref().map(|s| s.peer_id.clone()),
@@ -82,7 +84,11 @@ pub fn attach(view: Entity<MacRemote>, cx: &mut App) {
                     "revoke" => c.revoke(argument.clone(), cx),
                     "displays" => c.load_displays(cx),
                     "select" => c.select_display(argument.parse().unwrap_or(0), cx),
-                    "allow" => c.approve(cx),
+                    "allow" => c.approve(argument.parse().unwrap_or(0), cx),
+                    "forget" => {
+                        c.forget_remembered(Some(&argument));
+                        cx.notify();
+                    }
                     "deny" => c.decline(cx),
                     "end" => c.end(cx),
                     _ => eprintln!("e2e: unknown command {command}"),

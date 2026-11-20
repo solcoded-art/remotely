@@ -90,8 +90,23 @@ fn computer_name() -> String {
         .map(|name| name.trim().chars().take(73).collect::<String>())
         .filter(|name| !name.is_empty())
         .unwrap_or_else(|| "My Mac".into())
-        // Preview builds say so, to tell them apart from the Electron app on the phone.
-        + " · GPUI"
+        + name_suffix(option_env!("MAC_REMOTE_CHANNEL"))
+}
+
+/// Development builds say so, to tell them apart from a release on the phone.
+/// Release packages are built with `MAC_REMOTE_CHANNEL=release` (scripts/package-mac.sh).
+fn name_suffix(channel: Option<&str>) -> &'static str {
+    if channel == Some("release") { "" } else { " · GPUI" }
+}
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn release_builds_use_the_plain_mac_name() {
+        assert_eq!(super::name_suffix(Some("release")), "");
+        assert_eq!(super::name_suffix(None), " · GPUI");
+        assert_eq!(super::name_suffix(Some("dev")), " · GPUI");
+    }
 }
 
 impl Connection {
@@ -162,14 +177,16 @@ impl Connection {
                         json!({ "id": identity.id, "name": name, "kind": "desktop", "publicKey": identity.public_key, "challenge": challenge, "signature": signature }),
                     )?;
                     let devices = account::devices(&auth)?;
-                    Ok::<_, anyhow::Error>((identity, devices))
+                    let remembered = crate::remember::load(&storage_service(&auth.service), &auth.user.id)?;
+                    Ok::<_, anyhow::Error>((identity, devices, remembered))
                 })
                 .await;
             this.update(cx, |this, cx| match result {
-                Ok((identity, devices)) => {
+                Ok((identity, devices, remembered)) => {
                     if this.disposed {
                         return;
                     }
+                    this.desktop.remembered = remembered;
                     this.device_id = identity.id.clone();
                     this.pins = identity.pins();
                     this.identity = Some(identity);
@@ -520,6 +537,8 @@ impl Connection {
         }
         self.clear_pairing();
         self.pins = identity.pins();
+        // A new grant starts without a remembered window.
+        self.forget_remembered(Some(s(&grant, "controllerId")));
         self.pair_status = "Device paired. Every connection still needs approval on your Mac.".into();
         Ok(())
     }
@@ -527,6 +546,7 @@ impl Connection {
     fn revoked(&mut self, grant_id: String, cx: &mut Context<Self>) {
         let Ok(identity) = self.identity() else { return };
         let peers: Vec<String> = identity.pins().into_iter().filter(|(_, pin)| pin.grant_id == grant_id).map(|(id, _)| id).collect();
+        self.forget_remembered_grant(&grant_id);
         self.pair_status = "Device trust revoked. Pair again before connecting.".into();
         cx.spawn(async move |this, cx| {
             let result = {
@@ -549,6 +569,7 @@ impl Connection {
     pub fn revoke(&mut self, peer_id: String, cx: &mut Context<Self>) {
         let Ok(identity) = self.identity() else { return };
         let Some(pin) = identity.pins().get(&peer_id).cloned() else { return };
+        self.forget_remembered(Some(&peer_id));
         self.busy = true;
         cx.notify();
         cx.spawn(async move |this, cx| {

@@ -1,6 +1,6 @@
 [package]
 name = "mac-remote-gpui"
-version = "0.1.0"
+version = "0.4.0"
 edition = "2024"
 publish = false
 description = "Native GPUI build of the Mac Remote desktop companion (milestone 1: sign-in and devices)."
@@ -16,7 +16,7 @@ gpui = { version = "=0.2.2", default-features = false, features = ["font-kit", "
 ureq = { version = "3", default-features = false, features = ["rustls", "json"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = { version = "1", features = ["preserve_order"] }
-p256 = { version = "0.13", features = ["ecdsa"] }
+p256 = { version = "0.13", features = ["ecdsa", "pkcs8", "pem"] }
 sha2 = "0.10"
 hmac = "0.12"
 base64 = "0.22"
@@ -29,6 +29,10 @@ qrcode = { version = "0.14", default-features = false }
 webrtc = "0.21"
 rtc = { version = "=0.21.1", default-features = false }
 async-trait = "0.1"
+aes = "0.8"
+cbc = { version = "0.1", features = ["alloc"] }
+pbkdf2 = "0.12"
+sha1 = "0.10"
 objc = "0.2"
 tokio = { version = "1", features = ["rt-multi-thread", "sync", "time", "macros"] }
 bytes = "1"

@@ -1,0 +1,320 @@
+{
+ "unlockText": {
+  "args": [
+   "user-0001",
+   "d_mac",
+   "d_phone",
+   "BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB"
+  ],
+  "text": "[\"remotely-trust-v1\",\"session-unlock\",\"user-0001\",\"d_mac\",\"d_phone\",\"BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB\"]"
+ },
+ "cases": [
+  {
+   "name": "valid",
+   "kind": "unlock",
+   "publicKey": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAE0gAz4KHY6s19SawrdlMFMg3UYc4CNQnIvDpyiOYWkQt5-4bMEBI7ED0TNNnqHA5NbR_VC_lWW0PPiHxFG_5FnA",
+   "unlock": {
+    "credentialId": "Y3JlZGVudGlhbC0x",
+    "authenticatorData": "0-6xh4A0wtO71ZscovijaS9qukHLIBiQ9DHMQD3yXBIFAAAABw",
+    "clientDataJSON": "eyJ0eXBlIjoid2ViYXV0aG4uZ2V0IiwiY2hhbGxlbmdlIjoiV3lKeVpXMXZkR1ZzZVMxMGNuVnpkQzEyTVNJc0luTmxjM05wYjI0dGRXNXNiMk5ySWl3aWRYTmxjaTB3TURBeElpd2laRjl0WVdNaUxDSmtYM0JvYjI1bElpd2lRa0pDUWtKQ1FrSkNRa0pDUWtKQ1FrSkNRa0pDUWtKQ1FrSkNRa0pDUWtKQ1FrSkNRa0pDUWtKQ1FpSmQiLCJvcmlnaW4iOiJodHRwczovL2VuZnRpZnkuY29tIiwiY3Jvc3NPcmlnaW4iOmZhbHNlfQ",
+    "signature": "MEUCIQCI_klAq0FIkOdfst7-jbcZmZrponQ8I0IH1xAmUWnlcwIgFi_mSbfjn_-34Re3e09AIh3H3tjIocxhfJvbdcjWUFI"
+   },
+   "challenge": "WyJyZW1vdGVseS10cnVzdC12MSIsInNlc3Npb24tdW5sb2NrIiwidXNlci0wMDAxIiwiZF9tYWMiLCJkX3Bob25lIiwiQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQiJd",
+   "origin": "https://enftify.com",
+   "expected": true
+  },
+  {
+   "name": "highS",
+   "kind": "unlock",
+   "publicKey": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAE0gAz4KHY6s19SawrdlMFMg3UYc4CNQnIvDpyiOYWkQt5-4bMEBI7ED0TNNnqHA5NbR_VC_lWW0PPiHxFG_5FnA",
+   "unlock": {
+    "credentialId": "Y3JlZGVudGlhbC0x",
+    "authenticatorData": "0-6xh4A0wtO71ZscovijaS9qukHLIBiQ9DHMQD3yXBIFAAAABw",
+    "clientDataJSON": "eyJ0eXBlIjoid2ViYXV0aG4uZ2V0IiwiY2hhbGxlbmdlIjoiV3lKeVpXMXZkR1ZzZVMxMGNuVnpkQzEyTVNJc0luTmxjM05wYjI0dGRXNXNiMk5ySWl3aWRYTmxjaTB3TURBeElpd2laRjl0WVdNaUxDSmtYM0JvYjI1bElpd2lRa0pDUWtKQ1FrSkNRa0pDUWtKQ1FrSkNRa0pDUWtKQ1FrSkNRa0pDUWtKQ1FrSkNRa0pDUWtKQ1FpSmQiLCJvcmlnaW4iOiJodHRwczovL2VuZnRpZnkuY29tIiwiY3Jvc3NPcmlnaW4iOmZhbHNlfQ",
+    "signature": "MEUCIGYTMtsmRjCFybE4qim8YGlZ-FBfgNiws43sJwe1DrxSAiEAwBHz0uEvfHgwLH-g5xrXJQOI7HaHq9WCYb1tfWoF84I"
+   },
+   "challenge": "WyJyZW1vdGVseS10cnVzdC12MSIsInNlc3Npb24tdW5sb2NrIiwidXNlci0wMDAxIiwiZF9tYWMiLCJkX3Bob25lIiwiQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQiJd",
+   "origin": "https://enftify.com",
+   "expected": true
+  },
+  {
+   "name": "wrongChallenge",
+   "kind": "unlock",
+   "publicKey": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAE0gAz4KHY6s19SawrdlMFMg3UYc4CNQnIvDpyiOYWkQt5-4bMEBI7ED0TNNnqHA5NbR_VC_lWW0PPiHxFG_5FnA",
+   "unlock": {
+    "credentialId": "Y3JlZGVudGlhbC0x",
+    "authenticatorData": "0-6xh4A0wtO71ZscovijaS9qukHLIBiQ9DHMQD3yXBIFAAAABw",
+    "clientDataJSON": "eyJ0eXBlIjoid2ViYXV0aG4uZ2V0IiwiY2hhbGxlbmdlIjoiYjNSb1pYSSIsIm9yaWdpbiI6Imh0dHBzOi8vZW5mdGlmeS5jb20iLCJjcm9zc09yaWdpbiI6ZmFsc2V9",
+    "signature": "MEUCIQDGkd5uxwwF7OenRvNUOMG3tHRGNbXJlfiY6KNs0Tw6YAIgOPwKLyj4QtoHzqrBDdqmrgHFT0taSg4noTFccH9dJA0"
+   },
+   "challenge": "WyJyZW1vdGVseS10cnVzdC12MSIsInNlc3Npb24tdW5sb2NrIiwidXNlci0wMDAxIiwiZF9tYWMiLCJkX3Bob25lIiwiQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQiJd",
+   "origin": "https://enftify.com",
+   "expected": false
+  },
+  {
+   "name": "wrongOrigin",
+   "kind": "unlock",
+   "publicKey": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAE0gAz4KHY6s19SawrdlMFMg3UYc4CNQnIvDpyiOYWkQt5-4bMEBI7ED0TNNnqHA5NbR_VC_lWW0PPiHxFG_5FnA",
+   "unlock": {
+    "credentialId": "Y3JlZGVudGlhbC0x",
+    "authenticatorData": "nBgN4M1pnueIl8R8_bPn7h11kG4xt3RqR0fepTaQmDcFAAAABw",
+    "clientDataJSON": "eyJ0eXBlIjoid2ViYXV0aG4uZ2V0IiwiY2hhbGxlbmdlIjoiV3lKeVpXMXZkR1ZzZVMxMGNuVnpkQzEyTVNJc0luTmxjM05wYjI0dGRXNXNiMk5ySWl3aWRYTmxjaTB3TURBeElpd2laRjl0WVdNaUxDSmtYM0JvYjI1bElpd2lRa0pDUWtKQ1FrSkNRa0pDUWtKQ1FrSkNRa0pDUWtKQ1FrSkNRa0pDUWtKQ1FrSkNRa0pDUWtKQ1FpSmQiLCJvcmlnaW4iOiJodHRwczovL2V2aWwuZXhhbXBsZSIsImNyb3NzT3JpZ2luIjpmYWxzZX0",
+    "signature": "MEUCIQDOGf1LOX27LFtsSEIz0iTP1TDZMcD6d96YyC3S2qFiRAIgZ-fK_TRYVAP0z0eFZbRjlRKBExj1a8kSx7BwoPgYybU"
+   },
+   "challenge": "WyJyZW1vdGVseS10cnVzdC12MSIsInNlc3Npb24tdW5sb2NrIiwidXNlci0wMDAxIiwiZF9tYWMiLCJkX3Bob25lIiwiQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQiJd",
+   "origin": "https://enftify.com",
+   "expected": false
+  },
+  {
+   "name": "wrongRpId",
+   "kind": "unlock",
+   "publicKey": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAE0gAz4KHY6s19SawrdlMFMg3UYc4CNQnIvDpyiOYWkQt5-4bMEBI7ED0TNNnqHA5NbR_VC_lWW0PPiHxFG_5FnA",
+   "unlock": {
+    "credentialId": "Y3JlZGVudGlhbC0x",
+    "authenticatorData": "nBgN4M1pnueIl8R8_bPn7h11kG4xt3RqR0fepTaQmDcFAAAABw",
+    "clientDataJSON": "eyJ0eXBlIjoid2ViYXV0aG4uZ2V0IiwiY2hhbGxlbmdlIjoiV3lKeVpXMXZkR1ZzZVMxMGNuVnpkQzEyTVNJc0luTmxjM05wYjI0dGRXNXNiMk5ySWl3aWRYTmxjaTB3TURBeElpd2laRjl0WVdNaUxDSmtYM0JvYjI1bElpd2lRa0pDUWtKQ1FrSkNRa0pDUWtKQ1FrSkNRa0pDUWtKQ1FrSkNRa0pDUWtKQ1FrSkNRa0pDUWtKQ1FpSmQiLCJvcmlnaW4iOiJodHRwczovL2VuZnRpZnkuY29tIiwiY3Jvc3NPcmlnaW4iOmZhbHNlfQ",
+    "signature": "MEQCIFa18K4aCy4pjqHx0Tfjqp3BIVSuAiTUUmdVeegS9e17AiAqjPm87RM2XhfhNlJ_uKhxRWJAdbwuRlpamO0dyPyfZA"
+   },
+   "challenge": "WyJyZW1vdGVseS10cnVzdC12MSIsInNlc3Npb24tdW5sb2NrIiwidXNlci0wMDAxIiwiZF9tYWMiLCJkX3Bob25lIiwiQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQiJd",
+   "origin": "https://enftify.com",
+   "expected": false
+  },
+  {
+   "name": "createType",
+   "kind": "unlock",
+   "publicKey": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAE0gAz4KHY6s19SawrdlMFMg3UYc4CNQnIvDpyiOYWkQt5-4bMEBI7ED0TNNnqHA5NbR_VC_lWW0PPiHxFG_5FnA",
+   "unlock": {
+    "credentialId": "Y3JlZGVudGlhbC0x",
+    "authenticatorData": "0-6xh4A0wtO71ZscovijaS9qukHLIBiQ9DHMQD3yXBIFAAAABw",
+    "clientDataJSON": "eyJ0eXBlIjoid2ViYXV0aG4uY3JlYXRlIiwiY2hhbGxlbmdlIjoiV3lKeVpXMXZkR1ZzZVMxMGNuVnpkQzEyTVNJc0luTmxjM05wYjI0dGRXNXNiMk5ySWl3aWRYTmxjaTB3TURBeElpd2laRjl0WVdNaUxDSmtYM0JvYjI1bElpd2lRa0pDUWtKQ1FrSkNRa0pDUWtKQ1FrSkNRa0pDUWtKQ1FrSkNRa0pDUWtKQ1FrSkNRa0pDUWtKQ1FpSmQiLCJvcmlnaW4iOiJodHRwczovL2VuZnRpZnkuY29tIiwiY3Jvc3NPcmlnaW4iOmZhbHNlfQ",
+    "signature": "MEUCIQCN7580xD1SHcfQBzN59SdUmEqD6BvAf-GKt4Ouc46SpgIgN2vAQnmTi-6QIWAzDndEvJN5Pk8d70-l9ZcQY9WQvj8"
+   },
+   "challenge": "WyJyZW1vdGVseS10cnVzdC12MSIsInNlc3Npb24tdW5sb2NrIiwidXNlci0wMDAxIiwiZF9tYWMiLCJkX3Bob25lIiwiQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQiJd",
+   "origin": "https://enftify.com",
+   "expected": false
+  },
+  {
+   "name": "notVerified",
+   "kind": "unlock",
+   "publicKey": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAE0gAz4KHY6s19SawrdlMFMg3UYc4CNQnIvDpyiOYWkQt5-4bMEBI7ED0TNNnqHA5NbR_VC_lWW0PPiHxFG_5FnA",
+   "unlock": {
+    "credentialId": "Y3JlZGVudGlhbC0x",
+    "authenticatorData": "0-6xh4A0wtO71ZscovijaS9qukHLIBiQ9DHMQD3yXBIBAAAABw",
+    "clientDataJSON": "eyJ0eXBlIjoid2ViYXV0aG4uZ2V0IiwiY2hhbGxlbmdlIjoiV3lKeVpXMXZkR1ZzZVMxMGNuVnpkQzEyTVNJc0luTmxjM05wYjI0dGRXNXNiMk5ySWl3aWRYTmxjaTB3TURBeElpd2laRjl0WVdNaUxDSmtYM0JvYjI1bElpd2lRa0pDUWtKQ1FrSkNRa0pDUWtKQ1FrSkNRa0pDUWtKQ1FrSkNRa0pDUWtKQ1FrSkNRa0pDUWtKQ1FpSmQiLCJvcmlnaW4iOiJodHRwczovL2VuZnRpZnkuY29tIiwiY3Jvc3NPcmlnaW4iOmZhbHNlfQ",
+    "signature": "MEQCIGvxObR3JGkfb6r5TJrcxkWXApoM5SZ92AALrwcoqwBpAiBDklVqRwr-cFb5O0S6tnpK7daHqbE_E0yzKFTSwo-kyg"
+   },
+   "challenge": "WyJyZW1vdGVseS10cnVzdC12MSIsInNlc3Npb24tdW5sb2NrIiwidXNlci0wMDAxIiwiZF9tYWMiLCJkX3Bob25lIiwiQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQiJd",
+   "origin": "https://enftify.com",
+   "expected": false
+  },
+  {
+   "name": "otherKey",
+   "kind": "unlock",
+   "publicKey": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAE0gAz4KHY6s19SawrdlMFMg3UYc4CNQnIvDpyiOYWkQt5-4bMEBI7ED0TNNnqHA5NbR_VC_lWW0PPiHxFG_5FnA",
+   "unlock": {
+    "credentialId": "Y3JlZGVudGlhbC0x",
+    "authenticatorData": "0-6xh4A0wtO71ZscovijaS9qukHLIBiQ9DHMQD3yXBIFAAAABw",
+    "clientDataJSON": "eyJ0eXBlIjoid2ViYXV0aG4uZ2V0IiwiY2hhbGxlbmdlIjoiV3lKeVpXMXZkR1ZzZVMxMGNuVnpkQzEyTVNJc0luTmxjM05wYjI0dGRXNXNiMk5ySWl3aWRYTmxjaTB3TURBeElpd2laRjl0WVdNaUxDSmtYM0JvYjI1bElpd2lRa0pDUWtKQ1FrSkNRa0pDUWtKQ1FrSkNRa0pDUWtKQ1FrSkNRa0pDUWtKQ1FrSkNRa0pDUWtKQ1FpSmQiLCJvcmlnaW4iOiJodHRwczovL2VuZnRpZnkuY29tIiwiY3Jvc3NPcmlnaW4iOmZhbHNlfQ",
+    "signature": "MEQCIEx41xfbDrApF3QCAZlF85_JKjEXqbONxED06BDy_H9fAiAKmoJ3GvHrooa-h_bH8s0W7qI_dfejnm-2yJPl5PfSfQ"
+   },
+   "challenge": "WyJyZW1vdGVseS10cnVzdC12MSIsInNlc3Npb24tdW5sb2NrIiwidXNlci0wMDAxIiwiZF9tYWMiLCJkX3Bob25lIiwiQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQiJd",
+   "origin": "https://enftify.com",
+   "expected": false
+  },
+  {
+   "name": "tamperedCounter",
+   "kind": "unlock",
+   "publicKey": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAE0gAz4KHY6s19SawrdlMFMg3UYc4CNQnIvDpyiOYWkQt5-4bMEBI7ED0TNNnqHA5NbR_VC_lWW0PPiHxFG_5FnA",
+   "unlock": {
+    "credentialId": "Y3JlZGVudGlhbC0x",
+    "authenticatorData": "0-6xh4A0wtO71ZscovijaS9qukHLIBiQ9DHMQD3yXBIFAAAACQ",
+    "clientDataJSON": "eyJ0eXBlIjoid2ViYXV0aG4uZ2V0IiwiY2hhbGxlbmdlIjoiV3lKeVpXMXZkR1ZzZVMxMGNuVnpkQzEyTVNJc0luTmxjM05wYjI0dGRXNXNiMk5ySWl3aWRYTmxjaTB3TURBeElpd2laRjl0WVdNaUxDSmtYM0JvYjI1bElpd2lRa0pDUWtKQ1FrSkNRa0pDUWtKQ1FrSkNRa0pDUWtKQ1FrSkNRa0pDUWtKQ1FrSkNRa0pDUWtKQ1FpSmQiLCJvcmlnaW4iOiJodHRwczovL2VuZnRpZnkuY29tIiwiY3Jvc3NPcmlnaW4iOmZhbHNlfQ",
+    "signature": "MEUCIQCI_klAq0FIkOdfst7-jbcZmZrponQ8I0IH1xAmUWnlcwIgFi_mSbfjn_-34Re3e09AIh3H3tjIocxhfJvbdcjWUFI"
+   },
+   "challenge": "WyJyZW1vdGVseS10cnVzdC12MSIsInNlc3Npb24tdW5sb2NrIiwidXNlci0wMDAxIiwiZF9tYWMiLCJkX3Bob25lIiwiQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQiJd",
+   "origin": "https://enftify.com",
+   "expected": false
+  },
+  {
+   "name": "wrongKey",
+   "kind": "unlock",
+   "publicKey": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEb-DWed-rGPbVIX6t2pjv2wp8tNZWdUdc5zcTICaYQzeekUBqG-8XQw_Yo577Rc5BXLxIHVKcnu3oIEbGlainaA",
+   "unlock": {
+    "credentialId": "Y3JlZGVudGlhbC0x",
+    "authenticatorData": "0-6xh4A0wtO71ZscovijaS9qukHLIBiQ9DHMQD3yXBIFAAAABw",
+    "clientDataJSON": "eyJ0eXBlIjoid2ViYXV0aG4uZ2V0IiwiY2hhbGxlbmdlIjoiV3lKeVpXMXZkR1ZzZVMxMGNuVnpkQzEyTVNJc0luTmxjM05wYjI0dGRXNXNiMk5ySWl3aWRYTmxjaTB3TURBeElpd2laRjl0WVdNaUxDSmtYM0JvYjI1bElpd2lRa0pDUWtKQ1FrSkNRa0pDUWtKQ1FrSkNRa0pDUWtKQ1FrSkNRa0pDUWtKQ1FrSkNRa0pDUWtKQ1FpSmQiLCJvcmlnaW4iOiJodHRwczovL2VuZnRpZnkuY29tIiwiY3Jvc3NPcmlnaW4iOmZhbHNlfQ",
+    "signature": "MEUCIQCI_klAq0FIkOdfst7-jbcZmZrponQ8I0IH1xAmUWnlcwIgFi_mSbfjn_-34Re3e09AIh3H3tjIocxhfJvbdcjWUFI"
+   },
+   "challenge": "WyJyZW1vdGVseS10cnVzdC12MSIsInNlc3Npb24tdW5sb2NrIiwidXNlci0wMDAxIiwiZF9tYWMiLCJkX3Bob25lIiwiQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQiJd",
+   "origin": "https://enftify.com",
+   "expected": false
+  },
+  {
+   "name": "isUnlockRejectsLongField",
+   "kind": "isUnlock",
+   "unlock": {
+    "credentialId": "Y3JlZGVudGlhbC0x",
+    "authenticatorData": "0-6xh4A0wtO71ZscovijaS9qukHLIBiQ9DHMQD3yXBIFAAAABw",
+    "clientDataJSON": "eyJ0eXBlIjoid2ViYXV0aG4uZ2V0IiwiY2hhbGxlbmdlIjoiV3lKeVpXMXZkR1ZzZVMxMGNuVnpkQzEyTVNJc0luTmxjM05wYjI0dGRXNXNiMk5ySWl3aWRYTmxjaTB3TURBeElpd2laRjl0WVdNaUxDSmtYM0JvYjI1bElpd2lRa0pDUWtKQ1FrSkNRa0pDUWtKQ1FrSkNRa0pDUWtKQ1FrSkNRa0pDUWtKQ1FrSkNRa0pDUWtKQ1FpSmQiLCJvcmlnaW4iOiJodHRwczovL2VuZnRpZnkuY29tIiwiY3Jvc3NPcmlnaW4iOmZhbHNlfQ",
+    "signature": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+   },
+   "expected": false
+  },
+  {
+   "name": "isUnlockAcceptsValid",
+   "kind": "isUnlock",
+   "unlock": {
+    "credentialId": "Y3JlZGVudGlhbC0x",
+    "authenticatorData": "0-6xh4A0wtO71ZscovijaS9qukHLIBiQ9DHMQD3yXBIFAAAABw",
+    "clientDataJSON": "eyJ0eXBlIjoid2ViYXV0aG4uZ2V0IiwiY2hhbGxlbmdlIjoiV3lKeVpXMXZkR1ZzZVMxMGNuVnpkQzEyTVNJc0luTmxjM05wYjI0dGRXNXNiMk5ySWl3aWRYTmxjaTB3TURBeElpd2laRjl0WVdNaUxDSmtYM0JvYjI1bElpd2lRa0pDUWtKQ1FrSkNRa0pDUWtKQ1FrSkNRa0pDUWtKQ1FrSkNRa0pDUWtKQ1FrSkNRa0pDUWtKQ1FpSmQiLCJvcmlnaW4iOiJodHRwczovL2VuZnRpZnkuY29tIiwiY3Jvc3NPcmlnaW4iOmZhbHNlfQ",
+    "signature": "MEUCIQCI_klAq0FIkOdfst7-jbcZmZrponQ8I0IH1xAmUWnlcwIgFi_mSbfjn_-34Re3e09AIh3H3tjIocxhfJvbdcjWUFI"
+   },
+   "expected": true
+  },
+  {
+   "name": "create",
+   "kind": "key",
+   "key": {
+    "kind": "create",
+    "credentialId": "Y3JlZGVudGlhbC0x",
+    "publicKey": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAE0gAz4KHY6s19SawrdlMFMg3UYc4CNQnIvDpyiOYWkQt5-4bMEBI7ED0TNNnqHA5NbR_VC_lWW0PPiHxFG_5FnA",
+    "authenticatorData": "0-6xh4A0wtO71ZscovijaS9qukHLIBiQ9DHMQD3yXBJFAAAABwECAw",
+    "clientDataJSON": "eyJ0eXBlIjoid2ViYXV0aG4uY3JlYXRlIiwiY2hhbGxlbmdlIjoiOXJrMThkWlRrNjVzSVNOZGdHLTcxaVpvSEs4Wk8yNEIyZmVhcURIbUFGWSIsIm9yaWdpbiI6Imh0dHBzOi8vZW5mdGlmeS5jb20iLCJjcm9zc09yaWdpbiI6ZmFsc2V9"
+   },
+   "challenge": "9rk18dZTk65sISNdgG-71iZoHK8ZO24B2feaqDHmAFY",
+   "expected": "https://enftify.com"
+  },
+  {
+   "name": "createLocalhost",
+   "kind": "key",
+   "key": {
+    "kind": "create",
+    "credentialId": "Y3JlZGVudGlhbC0x",
+    "publicKey": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAE0gAz4KHY6s19SawrdlMFMg3UYc4CNQnIvDpyiOYWkQt5-4bMEBI7ED0TNNnqHA5NbR_VC_lWW0PPiHxFG_5FnA",
+    "authenticatorData": "SZYN5YgOjGh0NBcPZHZgW4_krrmihjLHmVzzuoMdl2NFAAAABwECAw",
+    "clientDataJSON": "eyJ0eXBlIjoid2ViYXV0aG4uY3JlYXRlIiwiY2hhbGxlbmdlIjoiOXJrMThkWlRrNjVzSVNOZGdHLTcxaVpvSEs4Wk8yNEIyZmVhcURIbUFGWSIsIm9yaWdpbiI6Imh0dHA6Ly9sb2NhbGhvc3Q6NTE3MyIsImNyb3NzT3JpZ2luIjpmYWxzZX0"
+   },
+   "challenge": "9rk18dZTk65sISNdgG-71iZoHK8ZO24B2feaqDHmAFY",
+   "expected": "http://localhost:5173"
+  },
+  {
+   "name": "createPlainHttp",
+   "kind": "key",
+   "key": {
+    "kind": "create",
+    "credentialId": "Y3JlZGVudGlhbC0x",
+    "publicKey": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAE0gAz4KHY6s19SawrdlMFMg3UYc4CNQnIvDpyiOYWkQt5-4bMEBI7ED0TNNnqHA5NbR_VC_lWW0PPiHxFG_5FnA",
+    "authenticatorData": "0-6xh4A0wtO71ZscovijaS9qukHLIBiQ9DHMQD3yXBJFAAAABwECAw",
+    "clientDataJSON": "eyJ0eXBlIjoid2ViYXV0aG4uY3JlYXRlIiwiY2hhbGxlbmdlIjoiOXJrMThkWlRrNjVzSVNOZGdHLTcxaVpvSEs4Wk8yNEIyZmVhcURIbUFGWSIsIm9yaWdpbiI6Imh0dHA6Ly9lbmZ0aWZ5LmNvbSIsImNyb3NzT3JpZ2luIjpmYWxzZX0"
+   },
+   "challenge": "9rk18dZTk65sISNdgG-71iZoHK8ZO24B2feaqDHmAFY",
+   "expected": null
+  },
+  {
+   "name": "createWrongType",
+   "kind": "key",
+   "key": {
+    "kind": "create",
+    "credentialId": "Y3JlZGVudGlhbC0x",
+    "publicKey": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAE0gAz4KHY6s19SawrdlMFMg3UYc4CNQnIvDpyiOYWkQt5-4bMEBI7ED0TNNnqHA5NbR_VC_lWW0PPiHxFG_5FnA",
+    "authenticatorData": "0-6xh4A0wtO71ZscovijaS9qukHLIBiQ9DHMQD3yXBJFAAAABwECAw",
+    "clientDataJSON": "eyJ0eXBlIjoid2ViYXV0aG4uZ2V0IiwiY2hhbGxlbmdlIjoiOXJrMThkWlRrNjVzSVNOZGdHLTcxaVpvSEs4Wk8yNEIyZmVhcURIbUFGWSIsIm9yaWdpbiI6Imh0dHBzOi8vZW5mdGlmeS5jb20iLCJjcm9zc09yaWdpbiI6ZmFsc2V9"
+   },
+   "challenge": "9rk18dZTk65sISNdgG-71iZoHK8ZO24B2feaqDHmAFY",
+   "expected": null
+  },
+  {
+   "name": "createNotVerified",
+   "kind": "key",
+   "key": {
+    "kind": "create",
+    "credentialId": "Y3JlZGVudGlhbC0x",
+    "publicKey": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAE0gAz4KHY6s19SawrdlMFMg3UYc4CNQnIvDpyiOYWkQt5-4bMEBI7ED0TNNnqHA5NbR_VC_lWW0PPiHxFG_5FnA",
+    "authenticatorData": "0-6xh4A0wtO71ZscovijaS9qukHLIBiQ9DHMQD3yXBJBAAAABwECAw",
+    "clientDataJSON": "eyJ0eXBlIjoid2ViYXV0aG4uY3JlYXRlIiwiY2hhbGxlbmdlIjoiOXJrMThkWlRrNjVzSVNOZGdHLTcxaVpvSEs4Wk8yNEIyZmVhcURIbUFGWSIsIm9yaWdpbiI6Imh0dHBzOi8vZW5mdGlmeS5jb20iLCJjcm9zc09yaWdpbiI6ZmFsc2V9"
+   },
+   "challenge": "9rk18dZTk65sISNdgG-71iZoHK8ZO24B2feaqDHmAFY",
+   "expected": null
+  },
+  {
+   "name": "createBadKey",
+   "kind": "key",
+   "key": {
+    "kind": "create",
+    "credentialId": "Y3JlZGVudGlhbC0x",
+    "publicKey": "bm90IGEga2V5",
+    "authenticatorData": "0-6xh4A0wtO71ZscovijaS9qukHLIBiQ9DHMQD3yXBJFAAAABwECAw",
+    "clientDataJSON": "eyJ0eXBlIjoid2ViYXV0aG4uY3JlYXRlIiwiY2hhbGxlbmdlIjoiOXJrMThkWlRrNjVzSVNOZGdHLTcxaVpvSEs4Wk8yNEIyZmVhcURIbUFGWSIsIm9yaWdpbiI6Imh0dHBzOi8vZW5mdGlmeS5jb20iLCJjcm9zc09yaWdpbiI6ZmFsc2V9"
+   },
+   "challenge": "9rk18dZTk65sISNdgG-71iZoHK8ZO24B2feaqDHmAFY",
+   "expected": null
+  },
+  {
+   "name": "createLongKey",
+   "kind": "key",
+   "key": {
+    "kind": "create",
+    "credentialId": "Y3JlZGVudGlhbC0x",
+    "publicKey": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+    "authenticatorData": "0-6xh4A0wtO71ZscovijaS9qukHLIBiQ9DHMQD3yXBJFAAAABwECAw",
+    "clientDataJSON": "eyJ0eXBlIjoid2ViYXV0aG4uY3JlYXRlIiwiY2hhbGxlbmdlIjoiOXJrMThkWlRrNjVzSVNOZGdHLTcxaVpvSEs4Wk8yNEIyZmVhcURIbUFGWSIsIm9yaWdpbiI6Imh0dHBzOi8vZW5mdGlmeS5jb20iLCJjcm9zc09yaWdpbiI6ZmFsc2V9"
+   },
+   "challenge": "9rk18dZTk65sISNdgG-71iZoHK8ZO24B2feaqDHmAFY",
+   "expected": null
+  },
+  {
+   "name": "get",
+   "kind": "key",
+   "key": {
+    "kind": "get",
+    "publicKey": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAE0gAz4KHY6s19SawrdlMFMg3UYc4CNQnIvDpyiOYWkQt5-4bMEBI7ED0TNNnqHA5NbR_VC_lWW0PPiHxFG_5FnA",
+    "credentialId": "Y3JlZGVudGlhbC0x",
+    "authenticatorData": "0-6xh4A0wtO71ZscovijaS9qukHLIBiQ9DHMQD3yXBIFAAAABw",
+    "clientDataJSON": "eyJ0eXBlIjoid2ViYXV0aG4uZ2V0IiwiY2hhbGxlbmdlIjoiOXJrMThkWlRrNjVzSVNOZGdHLTcxaVpvSEs4Wk8yNEIyZmVhcURIbUFGWSIsIm9yaWdpbiI6Imh0dHBzOi8vZW5mdGlmeS5jb20iLCJjcm9zc09yaWdpbiI6ZmFsc2V9",
+    "signature": "MEUCIQDhLZnDBmREvcR4z5WGnUclWsBttgwGr64XMiYIp4Xt3wIgZEPWk0arD7TyiW4kn4LDLsmBYDIdhfqD2Kj5C2DttcA"
+   },
+   "challenge": "9rk18dZTk65sISNdgG-71iZoHK8ZO24B2feaqDHmAFY",
+   "expected": "https://enftify.com"
+  },
+  {
+   "name": "getWrongKey",
+   "kind": "key",
+   "key": {
+    "kind": "get",
+    "publicKey": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEb-DWed-rGPbVIX6t2pjv2wp8tNZWdUdc5zcTICaYQzeekUBqG-8XQw_Yo577Rc5BXLxIHVKcnu3oIEbGlainaA",
+    "credentialId": "Y3JlZGVudGlhbC0x",
+    "authenticatorData": "0-6xh4A0wtO71ZscovijaS9qukHLIBiQ9DHMQD3yXBIFAAAABw",
+    "clientDataJSON": "eyJ0eXBlIjoid2ViYXV0aG4uZ2V0IiwiY2hhbGxlbmdlIjoiOXJrMThkWlRrNjVzSVNOZGdHLTcxaVpvSEs4Wk8yNEIyZmVhcURIbUFGWSIsIm9yaWdpbiI6Imh0dHBzOi8vZW5mdGlmeS5jb20iLCJjcm9zc09yaWdpbiI6ZmFsc2V9",
+    "signature": "MEQCIFSmEW2cXBAKH3_hmg0NT86-sPKbvZfZYqWzYX0yAnvTAiAmbfKZDts0n0U2CDDnmzlmWWeUGaF7M35L1KIcn7mVSA"
+   },
+   "challenge": "9rk18dZTk65sISNdgG-71iZoHK8ZO24B2feaqDHmAFY",
+   "expected": null
+  },
+  {
+   "name": "getNoSignature",
+   "kind": "key",
+   "key": {
+    "credentialId": "Y3JlZGVudGlhbC0x",
+    "authenticatorData": "0-6xh4A0wtO71ZscovijaS9qukHLIBiQ9DHMQD3yXBIFAAAABw",
+    "clientDataJSON": "eyJ0eXBlIjoid2ViYXV0aG4uZ2V0IiwiY2hhbGxlbmdlIjoiOXJrMThkWlRrNjVzSVNOZGdHLTcxaVpvSEs4Wk8yNEIyZmVhcURIbUFGWSIsIm9yaWdpbiI6Imh0dHBzOi8vZW5mdGlmeS5jb20iLCJjcm9zc09yaWdpbiI6ZmFsc2V9",
+    "kind": "get",
+    "publicKey": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAE0gAz4KHY6s19SawrdlMFMg3UYc4CNQnIvDpyiOYWkQt5-4bMEBI7ED0TNNnqHA5NbR_VC_lWW0PPiHxFG_5FnA"
+   },
+   "challenge": "9rk18dZTk65sISNdgG-71iZoHK8ZO24B2feaqDHmAFY",
+   "expected": null
+  },
+  {
+   "name": "unknownKind",
+   "kind": "key",
+   "key": {
+    "kind": "import",
+    "credentialId": "Y3JlZGVudGlhbC0x",
+    "publicKey": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAE0gAz4KHY6s19SawrdlMFMg3UYc4CNQnIvDpyiOYWkQt5-4bMEBI7ED0TNNnqHA5NbR_VC_lWW0PPiHxFG_5FnA",
+    "authenticatorData": "0-6xh4A0wtO71ZscovijaS9qukHLIBiQ9DHMQD3yXBJFAAAABwECAw",
+    "clientDataJSON": "eyJ0eXBlIjoid2ViYXV0aG4uY3JlYXRlIiwiY2hhbGxlbmdlIjoiOXJrMThkWlRrNjVzSVNOZGdHLTcxaVpvSEs4Wk8yNEIyZmVhcURIbUFGWSIsIm9yaWdpbiI6Imh0dHBzOi8vZW5mdGlmeS5jb20iLCJjcm9zc09yaWdpbiI6ZmFsc2V9"
+   },
+   "challenge": "9rk18dZTk65sISNdgG-71iZoHK8ZO24B2feaqDHmAFY",
+   "expected": null
+  }
+ ]
+}

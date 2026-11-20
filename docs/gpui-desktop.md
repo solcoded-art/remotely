@@ -1,8 +1,10 @@
 # Mac Remote on GPUI — plan
 
-Status: **milestones 1–3 built** in `desktop-gpui/` (sign-in, device key,
-signaling, pairing, approval, screen sharing over WebRTC, remote input).
-Remembered approvals, update prompts and packaging (milestone 4) are not built. The Electron app
+Status: **milestones 1–4 built** in `desktop-gpui/`: sign-in, device key,
+signaling, pairing, approval, screen sharing over WebRTC, remote input,
+remembered approval, Electron data import, update prompt and release packaging.
+Decision: the GPUI app **replaces the Electron app** (same name, bundle ID and
+download channel) from version 0.4.0. The Electron app
 (`desktop/`), the web app (`src/`), and the signaling service (`signaling/`) are
 unchanged. Nothing here changes the wire protocol.
 
@@ -52,12 +54,12 @@ origin share the storage key `https://remotely-marisol-workspace-k1zb.ongale.dev
 The GPUI app uses the same `storageService()` mapping for Keychain accounts, and
 the same `canonicalService()` for requests.
 
-The GPUI app **cannot read Electron's `safeStorage` files** without reimplementing
-Chromium's key derivation, so the first launch is a fresh sign-in and (later) a new
-device key. A new device key means phones must **re-pair once** with the GPUI build;
-that does not change the protocol. A one-time importer for Electron's device key is
-possible (Chromium `safeStorage` on macOS: AES-128-CBC, key from PBKDF2 over the
-"Mac Remote Safe Storage" Keychain password) and is listed as optional below.
+The GPUI app **imports Electron's data once** (`electron.rs`): device key, paired
+phones and sign-in, decrypted from Electron's `safeStorage` files (Chromium "v10":
+PBKDF2-SHA1 of the "Mac Remote Safe Storage" Keychain password, AES-128-CBC). It
+uses the same file names (SHA-256 of the same scopes), so phones keep their pairing.
+An Electron key that exists but cannot be read stops with an error instead of
+creating a new key.
 
 ## Milestones
 
@@ -74,7 +76,7 @@ possible (Chromium `safeStorage` on macOS: AES-128-CBC, key from PBKDF2 over the
    checklist (Screen Recording, Accessibility, driver), ScreenCaptureKit →
    VideoToolbox H.264 → webrtc-rs; signed SDP/ICE; `/api/ice` TURN credentials;
    data channel limits; driver bridge with `validateCommand` port.
-4. **Remembered approval** — Mac half of `remember.ts` (passkey verify, single-use
+4. **Remembered approval, updates, packaging (done)** — Mac half of `remember.ts` (passkey verify, single-use
    unlocks, ≤ 3 days, forget/forget-all on sign-out), update prompt, packaging
    (`.app` bundle, ad-hoc seal, entitlements, driver in `Contents/Resources`).
 
@@ -257,3 +259,53 @@ host candidate resolved.
 connections work. Phones on mobile data or other networks need `STUN_URL` and,
 for most NATs, `TURN_URLS`/`TURN_SECRET` set on the account service and a TURN
 relay deployed. This affects the Electron app equally.
+
+## Milestone 4 status
+
+- `remember.rs` + `connection/session.rs`: Mac half of `src/lib/remember.ts`. After
+  Allow with "Skip approval for", the Mac offers remembering over the data channel,
+  verifies the phone's passkey (WebAuthn ES256, `create` or `get`), and records
+  `{grantId, credentialId, publicKey, origin, until ≤ 3 days}` in the Keychain
+  vault. A later request whose unlock proof verifies, for that grant, with a
+  single-use controller nonce and the setup checklist complete, is approved without a
+  prompt. Records are forgotten on Forget, Revoke, re-pairing, a `revoked` message
+  and sign-out. `tests/fixtures/remember-vectors.json` comes from running the
+  JavaScript `verifyUnlock`/`verifyUnlockKey` on valid and tampered responses.
+- `electron.rs`: the import above, tested against real Electron output
+  (`tests/fixtures/electron-vectors.json`).
+- `update.rs`: checks `/api/downloads/mac` at launch and every 6 hours. It shows an
+  Update available card (Later is remembered per version) or a blocking dialog when
+  `minimumSupportedVersion` is newer, and opens only `<service>/download/mac`. There
+  is no native notification or focus re-check.
+- `scripts/package-mac.sh`: `target/dist/Mac Remote.app` and
+  `MacRemote-<version>-mac-arm64.zip` (+ `.sha256`). It uses
+  `com.macremote.companion`, the Electron usage strings and icon, the driver in
+  Resources, and ad-hoc signing with the hardened runtime, arm64 only.
+  `MAC_REMOTE_CHANNEL=release` drops the "· GPUI" device-name suffix.
+
+### Tests
+
+`cargo test` (19), plus four e2e scripts run through
+`node scripts/test-with-postgres.cjs node desktop-gpui/tests/<name>.mjs` after
+`(cd desktop-gpui && CARGO_TARGET_DIR=target/e2e cargo build --features e2e)`:
+
+- `e2e-pairing.mjs`: pairing, forged proof/request, decline, persistence, revoke.
+- `e2e-session.mjs`: phone web app in headless Chrome; WebRTC + H.264 + driver.
+- `e2e-remember.mjs`: Chrome's WebAuthn virtual authenticator stands in for Face ID.
+  It covers turning remembering on, a reconnect approved with no prompt, and Forget.
+- `e2e-electron-import.mjs`: real Electron runs `desktop/identity.cjs` under a
+  throwaway name and Keychain item; the GPUI app must start with Electron's
+  device ID and pinned phone.
+
+### Releasing 0.4.0 (manual, not done)
+
+1. `desktop-gpui/scripts/package-mac.sh` on Apple Silicon.
+2. Smoke-test `target/dist/Mac Remote.app` on a Mac that has the Electron app and
+   paired phones; confirm the phones still connect without re-pairing.
+3. Upload `MacRemote-0.4.0-mac-arm64.zip` to a `mac-v0.4.0` GitHub release.
+4. Then bump `release.config.json` (version `0.4.0`, the new URL) and deploy. Doing
+   this before the upload makes `/download/mac` unavailable. Electron 0.3.2+ users
+   then see the update prompt.
+
+Not built: keyframes on RTCP PLI/FIR, a preview of the shared screen on the Mac,
+display thumbnails, route/latency stats, Developer ID signing and notarization.

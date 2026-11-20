@@ -12,7 +12,8 @@ export const binary = new URL('../target/e2e/debug/mac-remote', import.meta.url)
 export const cleanups = [];
 
 /** The real signaling service on a fresh database, with mail captured in memory. */
-export async function startService() {
+/** `{ localhost: true }` serves on both IPv4 and IPv6 and reports a localhost URL (passkeys need a host name). */
+export async function startService({ localhost = false } = {}) {
   assert.ok(process.env.TEST_DATABASE_URL, 'Run through scripts/test-with-postgres.cjs.');
   const admin = new Client({ connectionString: process.env.TEST_DATABASE_URL });
   await admin.connect();
@@ -22,9 +23,9 @@ export async function startService() {
   const databaseURL = new URL(process.env.TEST_DATABASE_URL); databaseURL.pathname = '/' + dbName;
   const mails = [];
   const service = await createService({ publicURL: 'http://127.0.0.1:3000', authSecret: randomBytes(48).toString('base64url'), sendMail: async mail => { mails.push(mail); }, databaseURL: databaseURL.toString() });
-  service.server.listen(0, '127.0.0.1'); await once(service.server, 'listening');
+  service.server.listen(0, localhost ? '::' : '127.0.0.1'); await once(service.server, 'listening');
   cleanups.unshift(() => service.close());
-  const url = `http://127.0.0.1:${service.server.address().port}`;
+  const url = `http://${localhost ? 'localhost' : '127.0.0.1'}:${service.server.address().port}`;
   const api = async (route, token, data) => {
     const response = await fetch(url + route, { method: data ? 'POST' : 'GET', headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) }, ...(data ? { body: JSON.stringify(data) } : {}) });
     return { status: response.status, data: await response.json() };
@@ -43,8 +44,8 @@ export async function runCleanups() {
 }
 
 /** Starts the GPUI app (e2e build) signed in with `token`, reading its `E2E` state lines. */
-export function startMac(url, token) {
-  const child = spawn(binary, [], { env: { ...process.env, MAC_REMOTE_E2E_SERVER: url, MAC_REMOTE_E2E_TOKEN: token }, stdio: ['pipe', 'pipe', 'inherit'] });
+export function startMac(url, token, env = {}) {
+  const child = spawn(binary, [], { env: { ...process.env, ...env, MAC_REMOTE_E2E_SERVER: url, MAC_REMOTE_E2E_TOKEN: token }, stdio: ['pipe', 'pipe', 'inherit'] });
   cleanups.unshift(() => { if (child.exitCode === null) child.kill(); });
   const states = []; const waiters = [];
   let buffer = '';
