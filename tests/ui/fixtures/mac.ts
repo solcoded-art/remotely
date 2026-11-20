@@ -26,7 +26,9 @@ export async function installMacFixture(context: BrowserContext, overrides: { pe
       selectDisplay: async () => {}, approve: async () => {}, end: async () => {},
       command: async (_id: string, value: any) => {
         (window as any).commands.push(value);
-        if (value.action === 'listApps') listeners.forEach(listener => listener({ action: 'listApps', apps: [{ pid: 123, name: 'Visual Studio Code', bundleId: 'com.microsoft.VSCode', active: true }, { pid: 124, name: 'Safari', bundleId: 'com.apple.Safari', active: false }] }));
+        if (value.action === 'listApps') listeners.forEach(listener => listener({ action: 'listApps', features: ['appIcon'], apps: [{ pid: 123, name: 'Visual Studio Code', bundleId: 'com.microsoft.VSCode', active: true }, { pid: 124, name: 'Safari', bundleId: 'com.apple.Safari', active: false }] }));
+        // A 1×1 PNG stands in for the real icon; other apps have none.
+        if (value.action === 'appIcon') listeners.forEach(listener => listener({ action: 'appIcon', bundleId: value.bundleId, icon: value.bundleId === 'com.microsoft.VSCode' ? 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=' : null }));
       },
       onDriver: (listener: (value: unknown) => void) => { listeners.add(listener); return () => listeners.delete(listener); },
     };

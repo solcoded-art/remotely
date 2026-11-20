@@ -131,9 +131,12 @@ test('signaling requires matching ownership and explicit desktop approval', asyn
   ios.send({ type: 'connect', targetId: mac.id });
   assert.match((await ios.next('error')).message, /Pair this phone/);
   const grant = await pair(desktop, ios);
-  ios.send({ type: 'connect', targetId: mac.id });
+  // A remembered phone's unlock proof is relayed to the Mac verbatim (extra fields dropped); the session still waits for the Mac's signed approval.
+  ios.send({ type: 'connect', targetId: mac.id, canRemember: true, unlock: { credentialId: 'Y3JlZA', authenticatorData: 'YXV0aA', clientDataJSON: 'Y2xpZW50', signature: 'c2ln', extra: 'drop me' } });
   const pending = await ios.next('pending'); const incoming = await desktop.next('request');
   assert.equal(pending.sessionId, incoming.sessionId);
+  assert.equal(incoming.canRemember, true);
+  assert.deepEqual(incoming.unlock, { credentialId: 'Y3JlZA', authenticatorData: 'YXV0aA', clientDataJSON: 'Y2xpZW50', signature: 'c2ln' });
   desktop.send({ type: 'signal', sessionId: pending.sessionId, signal: { type: 'offer', sdp: 'test' } });
   assert.match((await desktop.next('error')).message, /approval/);
   ios.send({ type: 'approve', sessionId: pending.sessionId, allowed: true }); assert.match((await ios.next('error')).message, /Only the Mac/);

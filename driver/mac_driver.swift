@@ -18,6 +18,24 @@ func reply(_ json: [String: Any], _ values: [String: Any]) {
     }
 }
 
+let launchable: Set<String> = ["com.microsoft.VSCode", "com.todesktop.230313mzl4w4u92", "dev.zed.Zed", "com.apple.dt.Xcode", "com.apple.Terminal", "com.apple.finder", "com.apple.Safari", "com.google.Chrome"]
+
+/// Renders an app icon as a small PNG data URL that fits in one data-channel message.
+func pngDataURL(_ image: NSImage, size: Int) -> String? {
+    for side in [size, size / 2] {
+        guard let rep = NSBitmapImageRep(bitmapDataPlanes: nil, pixelsWide: side, pixelsHigh: side, bitsPerSample: 8, samplesPerPixel: 4, hasAlpha: true, isPlanar: false, colorSpaceName: .deviceRGB, bytesPerRow: 0, bitsPerPixel: 0) else { return nil }
+        NSGraphicsContext.saveGraphicsState()
+        NSGraphicsContext.current = NSGraphicsContext(bitmapImageRep: rep)
+        image.draw(in: NSRect(x: 0, y: 0, width: side, height: side), from: .zero, operation: .copy, fraction: 1)
+        NSGraphicsContext.restoreGraphicsState()
+        if let data = rep.representation(using: .png, properties: [:]) {
+            let text = "data:image/png;base64," + data.base64EncodedString()
+            if text.count <= 24000 { return text }
+        }
+    }
+    return nil
+}
+
 func releaseButtons() {
     if heldButtons.isEmpty { return }
     let pos = getCursorPos()
@@ -65,7 +83,18 @@ func handleCommand(_ json: [String: Any]) {
         let apps = NSWorkspace.shared.runningApplications.filter { $0.activationPolicy == .regular && !$0.isTerminated }.map { app -> [String: Any] in
             return ["pid": app.processIdentifier, "name": app.localizedName ?? "Application", "bundleId": app.bundleIdentifier ?? "", "active": app.processIdentifier == frontmost]
         }.sorted { ($0["name"] as? String ?? "") < ($1["name"] as? String ?? "") }
-        reply(json, ["apps": apps])
+        // `features` lets the phone know this driver can answer appIcon; older drivers omit it.
+        reply(json, ["apps": apps, "features": ["appIcon"]])
+
+    case "appIcon":
+        // Icons only for apps the phone can already see or open: running regular apps and the launch list.
+        guard let id = json["bundleId"] as? String else { return }
+        let running = NSWorkspace.shared.runningApplications.contains { $0.bundleIdentifier == id && $0.activationPolicy == .regular }
+        guard running || launchable.contains(id), let url = NSWorkspace.shared.urlForApplication(withBundleIdentifier: id) else {
+            reply(json, ["bundleId": id, "icon": NSNull()]); return
+        }
+        let icon = NSWorkspace.shared.icon(forFile: url.path)
+        reply(json, ["bundleId": id, "icon": pngDataURL(icon, size: 64) ?? NSNull()])
 
     case "activateApp":
         guard let pid = (json["pid"] as? NSNumber)?.int32Value,
@@ -75,8 +104,7 @@ func handleCommand(_ json: [String: Any]) {
         reply(json, ["ok": app.activate(options: [])])
 
     case "launchApp":
-        let allowed = ["com.microsoft.VSCode", "com.todesktop.230313mzl4w4u92", "dev.zed.Zed", "com.apple.dt.Xcode", "com.apple.Terminal", "com.apple.finder", "com.apple.Safari", "com.google.Chrome"]
-        guard let id = json["bundleId"] as? String, allowed.contains(id) else { return }
+        guard let id = json["bundleId"] as? String, launchable.contains(id) else { return }
         guard NSWorkspace.shared.urlForApplication(withBundleIdentifier: id) != nil else { reply(json, ["error": "This app is not installed on your Mac."]); return }
         let process = Process()
         process.executableURL = URL(fileURLWithPath: "/usr/bin/open")

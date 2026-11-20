@@ -289,7 +289,12 @@ async function createService(options = {}) {
           const timer = setTimeout(() => finish(id, 'Approval timed out'), 60000);
           sessions.set(id, { desktop: desktop.device.id, controller: identity.device.id, approved: false, timer, grantId: pair.id, controllerNonce: data.controllerNonce });
           send(ws, { type: 'pending', sessionId: id, name: desktop.device.name, peerId: desktop.device.id, grantId: pair.id, controllerNonce: data.controllerNonce });
-          send(desktop.ws, { type: 'request', sessionId: id, name: identity.device.name, peerId: identity.device.id, grantId: pair.id, controllerNonce: data.controllerNonce, requestSignature: data.requestSignature }); return;
+          // Optional, for a Mac that remembers this phone: an unlock proof only the Mac can check.
+          // The service relays it unchanged and still waits for the Mac's signed approval.
+          const b64 = value => typeof value === 'string' && value.length <= 2048 && /^[A-Za-z0-9_-]+$/.test(value);
+          const u = data.unlock;
+          const unlock = u && typeof u === 'object' && [u.credentialId, u.authenticatorData, u.clientDataJSON, u.signature].every(b64) ? { credentialId: u.credentialId, authenticatorData: u.authenticatorData, clientDataJSON: u.clientDataJSON, signature: u.signature } : undefined;
+          send(desktop.ws, { type: 'request', sessionId: id, name: identity.device.name, peerId: identity.device.id, grantId: pair.id, controllerNonce: data.controllerNonce, requestSignature: data.requestSignature, canRemember: data.canRemember === true, ...(unlock ? { unlock } : {}) }); return;
         }
         const session = sessions.get(data.sessionId);
         if (!session || ![session.desktop, session.controller].includes(identity.device.id)) throw fail(403, 'Session is unavailable.');

@@ -13,6 +13,7 @@ function validateCommand(data) {
   else if (['listApps', 'getBounds', 'getPos', 'releaseAll', 'status'].includes(action)) output = { action };
   else if (action === 'activateApp' && Number.isInteger(data.pid) && data.pid > 0 && data.pid <= 2147483647) output = { action, pid: data.pid };
   else if (action === 'launchApp' && launches.has(data.bundleId)) output = { action, bundleId: data.bundleId };
+  else if (action === 'appIcon' && typeof data.bundleId === 'string' && /^[A-Za-z0-9][A-Za-z0-9.\-_]{0,199}$/.test(data.bundleId)) output = { action, bundleId: data.bundleId };
   else throw Error('Unsupported or invalid command.');
   return id ? { ...output, requestId: id } : output;
 }

@@ -93,7 +93,8 @@ main:focus, .page-title:focus { outline: none; }
 .progress-steps li.is-complete { color: var(--primary); }
 .progress-steps li > span:first-child { display: grid; place-items: center; border: 1px solid currentColor; width: 24px; height: 24px; border-radius: 50%; }
 .viewer { position: relative; margin: 0; background: #080b0d; border: 1px solid var(--border); border-radius: 14px; overflow: hidden; display: grid; place-items: center; aspect-ratio: 16/10; min-height: 180px; }
-.viewer video { width: 100%; height: 100%; object-fit: contain; display: block; }
+/* Positioned, so the video always fits the figure's box: a sized grid item would take the stream's shape and overflow. */
+.viewer video { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; display: block; }
 .viewer-empty { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; flex-direction: column; gap: 12px; color: var(--muted-foreground); padding: 16px; text-align: center; font-size: .875rem; overflow: auto; }
 .session-actions { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 14px; border: 1px solid var(--border); border-radius: 12px; background: var(--card); margin-bottom: 14px; }
 .session-actions p { font-size: .875rem; line-height: 1.7; color: var(--muted-foreground); }
@@ -229,6 +230,8 @@ button[data-slot="button"] { border-radius: 10px; }
 .panzoom-content { position: relative; transform-origin: 0 0; will-change: transform; }
 .session-controls { container: dock / inline-size; display: grid; gap: 6px; min-width: 0; }
 .session-controls.is-hidden { display: none; }
+.remember-offer { display: flex; align-items: center; gap: 8px; min-width: 0; padding: 6px 6px 6px 12px; border: 1px solid #2a2d3c; border-radius: 12px; background: #14161f; color: var(--muted-foreground); font-size: .8125rem; }
+.remember-offer p { flex: 1; min-width: 0; color: var(--foreground); }
 
 .control-dock { display: grid; grid-template-areas: "apps" "mouse" "keys"; gap: 8px; min-width: 0; padding: 8px; border: 1px solid var(--border); border-radius: 18px; background: var(--card); --kb-h: 40px; }
 .app-dock { grid-area: apps; display: flex; gap: 6px; min-width: 0; overflow: auto hidden; scrollbar-width: none; overscroll-behavior: contain; }
@@ -239,6 +242,9 @@ button[data-slot="button"] { border-radius: 10px; }
 .dock-item.is-active { background: #20244a; border-color: #5b6cf0; }
 .dock-item.is-active::after { content: ""; position: absolute; bottom: 3px; width: 4px; height: 4px; border-radius: 50%; background: var(--primary); }
 .dock-launcher { background: transparent; border: 1px dashed var(--border); color: var(--muted-foreground); }
+.dock-icon { width: 30px; height: 30px; object-fit: contain; pointer-events: none; -webkit-user-drag: none; }
+.dock-letter { display: grid; place-items: center; width: 28px; height: 28px; border-radius: 8px; background: oklch(.42 .09 var(--tile-hue, 260)); color: #fff; font-size: .8125rem; font-weight: 650; }
+.dock-launcher .dock-icon, .dock-launcher .dock-letter { opacity: .6; filter: grayscale(.4); }
 .dock-refresh { background: transparent; color: var(--muted-foreground); }
 .dock-mouse { grid-area: mouse; display: flex; flex-direction: column; gap: 6px; min-width: 0; }
 .dock-buttons { display: grid; grid-auto-columns: minmax(0, 1fr); grid-auto-flow: column; gap: 6px; }

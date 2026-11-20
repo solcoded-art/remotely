@@ -1,12 +1,14 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Maximize2, Minimize2, Plus, Unplug, ZoomIn, ZoomOut } from 'lucide-react';
+import { Expand, Maximize2, Minimize2, Plus, ShieldCheck, Shrink, Unplug, X, ZoomIn, ZoomOut } from 'lucide-react';
 import { ConnectionProgress } from '@/components/ConnectionProgress';
+import { Button } from '@/components/ui/button';
 import { Viewer } from '@/components/Viewer';
 import { ControlDock } from '@/components/remote/ControlDock';
 import { PanZoomScreen, type ZoomApi } from '@/components/remote/PanZoomScreen';
 import { ScreenSpaceContext, toLocalDelta } from '@/components/remote/screen-space';
 import { cn } from '@/lib/utils';
 import { RemoteInput } from '@/lib/remote-input';
+import { preferences, usePreferences } from '@/lib/preferences';
 import type { Connection, ConnectionSnapshot } from '@/lib/connection';
 
 type OrientationLock = ScreenOrientation & { lock?(orientation: 'landscape'): Promise<void> };
@@ -48,9 +50,12 @@ export function RemoteSession({ connection, state }: { connection: Connection; s
   const [portrait, setPortrait] = useState(false);
   const [scale, setScale] = useState(1);
   const root = useRef<HTMLDivElement>(null);
+  const controls = useRef<HTMLDivElement>(null);
+  const [covered, setCovered] = useState(0);
   const fullscreenButton = useRef<HTMLButtonElement>(null);
   const fab = useRef<HTMLButtonElement>(null);
   const zoom = useRef<ZoomApi>(null);
+  const { screenFill } = usePreferences();
   const input = useMemo(() => new RemoteInput(connection), [connection]);
   const connected = state.status === 'connected';
   const live = connected && videoReady;
@@ -116,6 +121,17 @@ export function RemoteSession({ connection, state }: { connection: Connection; s
     return () => { changed.forEach(element => element.removeAttribute('inert')); document.removeEventListener('keydown', escape); };
   }, [fullscreen, exitFullscreen]);
 
+  // In fullscreen the open dock overlays the bottom of the screen; tell the zoom how much it hides.
+  useEffect(() => {
+    const element = controls.current;
+    if (!fullscreen || !dockOpen || !element) { setCovered(0); return; }
+    const measure = () => { const surface = element.offsetParent as HTMLElement | null; setCovered(surface ? Math.max(0, surface.offsetHeight - element.offsetTop) : 0); };
+    measure();
+    const observer = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(measure);
+    observer?.observe(element); if (element.offsetParent) observer?.observe(element.offsetParent);
+    return () => observer?.disconnect();
+  }, [fullscreen, dockOpen]);
+
   // ⌘/Ctrl + and − zoom the Mac screen, ⌘/Ctrl 0 resets.
   useEffect(() => {
     const keys = (event: KeyboardEvent) => {
@@ -136,6 +152,9 @@ export function RemoteSession({ connection, state }: { connection: Connection; s
     {scale > 1 && <button type="button" className="tool-button tool-zoom" aria-label="Reset zoom" title="Reset zoom" onClick={() => zoom.current?.reset()}>{Math.round(scale * 100)}%</button>}
     <button type="button" className="tool-button" aria-label="Zoom out" title="Zoom out (⌘ −)" disabled={scale <= 1} onClick={() => zoom.current?.zoomBy(0.8)}><ZoomOut size={16} aria-hidden="true" /></button>
     <button type="button" className="tool-button" aria-label="Zoom in" title="Zoom in (⌘ +)" disabled={!state.stream || scale >= 5} onClick={() => zoom.current?.zoomBy(1.25)}><ZoomIn size={16} aria-hidden="true" /></button>
+    {fullscreen && <button type="button" className="tool-button" aria-label="Fill screen" aria-pressed={screenFill} title={screenFill ? 'Fit whole screen' : 'Fill screen'} onClick={() => preferences.setScreenFill(!screenFill)}>
+      {screenFill ? <Shrink size={16} aria-hidden="true" /> : <Expand size={16} aria-hidden="true" />}
+    </button>}
     <button ref={fullscreen ? undefined : fullscreenButton} type="button" className="tool-button" aria-label={fullscreen ? 'Exit fullscreen' : 'Fullscreen'} title={fullscreen ? 'Exit fullscreen' : 'Fullscreen'} disabled={!state.stream} onClick={fullscreen ? exitFullscreen : () => void enterFullscreen()}>
       {fullscreen ? <Minimize2 size={16} aria-hidden="true" /> : <Maximize2 size={16} aria-hidden="true" />}
     </button>
@@ -152,8 +171,14 @@ export function RemoteSession({ connection, state }: { connection: Connection; s
         <p className="session-status" role="status" aria-atomic="true"><span className={cn('status-dot', live && 'online')} aria-hidden="true" /><span className="truncate">{state.session?.name}</span>{live && <span className="sr-only">Session connected</span>}{state.latency !== null && <span className="session-latency">{state.latency} ms</span>}</p>
         {tools}
       </div>}
+      {!fullscreen && state.rememberOffer && <div className="remember-offer" role="region" aria-label="Skip Mac approval">
+        <ShieldCheck size={16} aria-hidden="true" />
+        <p>Skip Mac approval until {new Date(state.rememberOffer.until).toLocaleString(undefined, { weekday: 'short', hour: 'numeric', minute: '2-digit' })}</p>
+        <Button type="button" size="sm" onClick={() => void connection.acceptRemember()}>Turn on</Button>
+        <button type="button" className="tool-button" aria-label="Not now" title="Not now" onClick={connection.dismissRemember}><X size={15} aria-hidden="true" /></button>
+      </div>}
       <section className="session-screen" aria-label="Your Mac screen">
-        <PanZoomScreen enabled={live} send={input.send} zoomRef={zoom} onZoomChange={setScale}>
+        <PanZoomScreen enabled={live} fill={fullscreen && screenFill} covered={covered} send={input.send} zoomRef={zoom} onZoomChange={setScale}>
           <Viewer connection={connection} stream={state.stream} desktop={false} onReadyChange={setVideoReady} />
         </PanZoomScreen>
         {fullscreen && !dockOpen && <>
@@ -161,7 +186,7 @@ export function RemoteSession({ connection, state }: { connection: Connection; s
           <ControlsButton rotated={rotated} buttonRef={fab} onOpen={() => setDockOpen(true)} />
         </>}
       </section>
-      <div className={cn('session-controls', fullscreen && !dockOpen && 'is-hidden')}>
+      <div ref={controls} className={cn('session-controls', fullscreen && !dockOpen && 'is-hidden')}>
         {fullscreen && tools}
         <ControlDock input={input} enabled={live} apps={state.apps} refreshApps={connection.refreshApps}
           onHide={fullscreen ? () => { setDockOpen(false); requestAnimationFrame(() => fab.current?.focus()); } : undefined} />

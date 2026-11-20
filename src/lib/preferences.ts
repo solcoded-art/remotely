@@ -2,10 +2,11 @@ import { useSyncExternalStore } from 'react';
 import { DEFAULT_HOTKEYS, isHotkey, type Hotkey } from './keymap';
 
 /** Per-device remote control preferences. Stored locally; never sent to the account service. */
-export type Preferences = { trackpadSpeed: number; hotkeys: Hotkey[] };
+export type Preferences = { trackpadSpeed: number; hotkeys: Hotkey[]; screenFill: boolean };
 
 const SPEED_KEY = 'macremote.sensitivity';
 const HOTKEYS_KEY = 'macremote.hotkeys';
+const FILL_KEY = 'remotely.screen-fill';
 export const SPEED_RANGE = { min: 0.5, max: 3, step: 0.1, fallback: 1.4 } as const;
 
 function read(key: string) { try { return localStorage.getItem(key); } catch { return null; } }
@@ -18,7 +19,7 @@ function load(): Preferences {
     const saved = JSON.parse(read(HOTKEYS_KEY) || 'null');
     if (Array.isArray(saved)) hotkeys = saved.filter(isHotkey).slice(0, 48);
   } catch { /* keep defaults */ }
-  return { trackpadSpeed: Number.isFinite(speed) && speed >= SPEED_RANGE.min && speed <= SPEED_RANGE.max ? speed : SPEED_RANGE.fallback, hotkeys };
+  return { trackpadSpeed: Number.isFinite(speed) && speed >= SPEED_RANGE.min && speed <= SPEED_RANGE.max ? speed : SPEED_RANGE.fallback, hotkeys, screenFill: read(FILL_KEY) !== 'fit' };
 }
 
 let state = load();
@@ -32,6 +33,8 @@ export const preferences = {
     const speed = Math.min(SPEED_RANGE.max, Math.max(SPEED_RANGE.min, Math.round(value * 10) / 10));
     write(SPEED_KEY, String(speed)); set({ trackpadSpeed: speed });
   },
+  /** Fullscreen fills the phone with the Mac screen (cropping, pannable) or fits all of it. */
+  setScreenFill(screenFill: boolean) { write(FILL_KEY, screenFill ? 'fill' : 'fit'); set({ screenFill }); },
   setHotkeys(hotkeys: Hotkey[]) { write(HOTKEYS_KEY, JSON.stringify(hotkeys)); set({ hotkeys }); },
   addHotkey(hotkey: Omit<Hotkey, 'id'>) {
     const item = { ...hotkey, label: hotkey.label.trim(), id: `custom-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}` };

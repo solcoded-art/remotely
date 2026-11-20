@@ -59,7 +59,11 @@ test('real login and WebRTC connection with a synthetic desktop capture', async 
   await phone.getByRole('button', { name: 'Connect to Test Mac', exact: true }).click();
   await desktop.getByRole('button', { name: 'Allow connection', exact: true }).click();
   await expect(phone.getByText('Session connected', { exact: true })).toBeVisible({ timeout: 20000 });
-  await expect(phone.getByRole('button', { name: 'Visual Studio Code', exact: true })).toBeVisible();
+  await expect(phone.getByRole('button', { name: 'Visual Studio Code, next window', exact: true })).toBeVisible();
+  // The Mac sends real app icons one at a time; apps without one keep a letter tile.
+  await expect(phone.getByRole('button', { name: 'Visual Studio Code, next window', exact: true }).locator('img')).toHaveAttribute('src', /^data:image\/png;base64,/);
+  await expect(phone.getByRole('button', { name: 'Safari', exact: true }).locator('.dock-letter')).toHaveText('S');
+  await expect.poll(() => desktop.evaluate(() => (window as any).commands.filter((value: any) => value.action === 'appIcon').map((value: any) => value.bundleId).sort())).toEqual(['com.apple.Safari', 'com.apple.Terminal', 'com.microsoft.VSCode', 'com.todesktop.230313mzl4w4u92', 'dev.zed.Zed']);
   await expect.poll(() => phone.locator('video').evaluate((video: HTMLVideoElement) => video.videoWidth)).toBeGreaterThan(0);
   await expectAccessible(phone);
   await phone.locator('video').evaluate((video: HTMLVideoElement) => video.pause());
@@ -69,12 +73,17 @@ test('real login and WebRTC connection with a synthetic desktop capture', async 
   await expect(phone.getByText('Session connected', { exact: true })).toBeVisible();
   await phone.getByRole('button', { name: 'Safari', exact: true }).click();
   await expect.poll(() => desktop.evaluate(() => (window as any).commands.some((value: any) => value.action === 'activateApp' && value.pid === 124))).toBe(true);
+  // Tapping the app already in front cycles its windows with ⌘`.
+  await phone.getByRole('button', { name: 'Visual Studio Code, next window', exact: true }).click();
+  await expect.poll(() => desktop.evaluate(() => (window as any).commands.some((value: any) => value.action === 'key' && value.code === 50 && value.modifiers.join() === 'cmd'))).toBe(true);
   await phone.getByRole('button', { name: 'Open Zed', exact: true }).click();
   await expect.poll(() => desktop.evaluate(() => (window as any).commands.some((value: any) => value.action === 'launchApp' && value.bundleId === 'dev.zed.Zed'))).toBe(true);
   // Running apps are not repeated as launchers.
   await expect(phone.getByRole('button', { name: 'Open VS Code', exact: true })).toHaveCount(0);
   for (const [width, height] of [[320, 568], [390, 844], [844, 390], [1280, 900]]) {
     await phone.setViewportSize({ width, height }); await noOverflow(phone);
+    // The video box stays inside the screen box, so no edge of the Mac is ever cropped away.
+    expect(await phone.locator('.session-screen video').evaluate((video: HTMLVideoElement) => { const box = video.getBoundingClientRect(), figure = video.parentElement!.getBoundingClientRect(); return box.height <= figure.height + 1 && box.width <= figure.width + 1; })).toBe(true);
     await phone.screenshot({ path: `artifacts/session-${width}.png`, fullPage: true });
   }
   await phone.setViewportSize({ width: 390, height: 844 });
@@ -167,6 +176,21 @@ test('real login and WebRTC connection with a synthetic desktop capture', async 
   await expect(surface).toBeVisible();
   await expect(surface.locator('video')).toBeVisible();
   await expect(surface.getByRole('region', { name: 'Remote controls' })).toBeHidden();
+  // Fullscreen fills the stage with the Mac frame by default; the fit toggle shows all of it.
+  // Measured in the surface's own (unrotated) coordinates: does the Mac frame cover the visible stage?
+  const coverage = () => phone.evaluate(() => {
+    const stage = document.querySelector('.panzoom-stage') as HTMLElement; const content = stage.firstElementChild as HTMLElement; const video = stage.querySelector('video')!;
+    const [, x, y, s] = content.style.transform.match(/translate\((-?[\d.e-]+)px, (-?[\d.e-]+)px\) scale\(([\d.e-]+)\)/)!.map(Number);
+    const fit = Math.min(video.offsetWidth / video.videoWidth, video.offsetHeight / video.videoHeight);
+    const w = video.videoWidth * fit, h = video.videoHeight * fit;
+    const left = x + (video.offsetWidth - w) / 2 * s, top = y + (video.offsetHeight - h) / 2 * s;
+    // An open dock hides the bottom of the stage; only the area above it has to be covered.
+    const controls = document.querySelector('.session-controls:not(.is-hidden)') as HTMLElement | null;
+    const visible = stage.offsetHeight - (controls ? (controls.offsetParent as HTMLElement).offsetHeight - controls.offsetTop : 0);
+    return left <= 1 && top <= 1 && left + w * s >= stage.offsetWidth - 1 && top + h * s >= visible - 1;
+  });
+  await expect.poll(coverage).toBe(true);
+  await expect(surface.getByRole('button', { name: 'Reset zoom', exact: true })).toHaveCount(0);
   const fab = surface.getByRole('button', { name: 'Show controls', exact: true });
   const before = await fab.boundingBox();
   await phone.mouse.move(before!.x + 24, before!.y + 24); await phone.mouse.down();
@@ -181,6 +205,11 @@ test('real login and WebRTC connection with a synthetic desktop capture', async 
   await expect(surface.getByRole('button', { name: 'Hide controls', exact: true })).toBeVisible();
   await expectAccessible(phone);
   await phone.screenshot({ path: 'artifacts/fullscreen-open-390.png' });
+  await surface.getByRole('button', { name: 'Fill screen', exact: true }).click();
+  await expect(surface.getByRole('button', { name: 'Fill screen', exact: true })).toHaveAttribute('aria-pressed', 'false');
+  await expect.poll(coverage).toBe(false);
+  await surface.getByRole('button', { name: 'Fill screen', exact: true }).click();
+  await expect.poll(coverage).toBe(true);
   // Portrait phones without an orientation lock rotate the surface to landscape.
   expect(await phone.evaluate(() => { const surface = document.querySelector('.remote-surface')!; const rect = surface.getBoundingClientRect(); return surface.hasAttribute('data-rotated') && getComputedStyle(surface).transform !== 'none' && Math.round(rect.width) === 390 && Math.round(rect.height) === 844; })).toBe(true);
   await phone.setViewportSize({ width: 844, height: 390 }); await noOverflow(phone);
@@ -368,5 +397,75 @@ test('a wrong pairing secret and a signaling relay that changes the Mac certific
     await expect(phone.locator('video')).toHaveCount(0);
     await expect.poll(() => desktop.evaluate(() => (window as any).commands.length)).toBe(0);
     await expect(desktop.locator('video')).toHaveCount(0);
+  } finally { await desktopContext.close(); await phoneContext.close(); }
+});
+
+test('a remembered phone reconnects after a verified unlock, never longer than 3 days, until the Mac forgets it', async ({ browser }) => {
+  const desktopContext = await browser.newContext({ viewport: { width: 1280, height: 900 } });
+  const phoneContext = await browser.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
+  await installMacFixture(desktopContext);
+  const desktop = await desktopContext.newPage(); const phone = await phoneContext.newPage();
+  // A virtual platform authenticator stands in for Face ID: it verifies the user on every request.
+  const cdp = await phoneContext.newCDPSession(phone);
+  await cdp.send('WebAuthn.enable');
+  const { authenticatorId } = await cdp.send('WebAuthn.addVirtualAuthenticator', { options: { protocol: 'ctap2', transport: 'internal', hasResidentKey: true, hasUserVerification: true, isUserVerified: true, automaticPresenceSimulation: true } });
+  try {
+    const email = `remember-${Date.now()}@example.com`;
+    await login(desktop, email);
+    await desktop.getByRole('button', { name: 'Choose display', exact: true }).click();
+    await desktop.getByRole('button', { name: 'Main display' }).click();
+    // Passkeys need a domain name, so the phone uses localhost rather than the IP address.
+    await phone.goto('http://localhost:5173/login'); await login(phone, email, { navigate: false });
+    await desktop.getByRole('button', { name: 'Create pairing link', exact: true }).click();
+    const link = (await desktop.getByLabel('One-use pairing link', { exact: true }).inputValue()).replace('http://127.0.0.1:5173', 'http://localhost:5173');
+    await phone.getByLabel('Pairing link from your Mac').fill(link);
+    await phone.getByRole('button', { name: 'Request pairing', exact: true }).click();
+    await desktop.getByRole('button', { name: 'Allow pairing', exact: true }).click();
+    const connect = phone.getByRole('button', { name: 'Connect to Test Mac', exact: true });
+    await expect(connect).toBeEnabled();
+
+    // First connection: approved on the Mac, which offers at most 3 days.
+    await connect.click();
+    const skip = desktop.getByLabel('Skip approval for');
+    await expect(skip).toBeVisible();
+    expect(await skip.locator('option').allTextContents()).toEqual(['Ask every time', '12 hours', '1 day', '3 days']);
+    await skip.selectOption({ label: '3 days' });
+    await expectAccessible(desktop);
+    await desktop.getByRole('button', { name: 'Allow connection', exact: true }).click();
+    await expect(phone.getByText('Session connected', { exact: true })).toBeVisible({ timeout: 20000 });
+    const offer = phone.getByRole('region', { name: 'Skip Mac approval' });
+    await expect(offer).toBeVisible();
+    await expectAccessible(phone);
+    await offer.getByRole('button', { name: 'Turn on', exact: true }).click();
+    await expect(offer).toHaveCount(0);
+    await expect(desktop.getByText(/^Skips approval until /)).toBeVisible();
+    const until = await desktop.evaluate(() => Math.max(...Object.keys(localStorage).filter(key => key.startsWith('remotely.remembered-phones:')).flatMap(key => Object.values(JSON.parse(localStorage.getItem(key)!)).map((record: any) => record.until))));
+    expect(until - Date.now()).toBeGreaterThan(3 * 24 * 3600_000 - 120_000);
+    expect(until - Date.now()).toBeLessThanOrEqual(3 * 24 * 3600_000);
+
+    // Reconnect: the unlock proof replaces the prompt. Nobody touches the Mac.
+    await phone.getByRole('button', { name: 'Disconnect', exact: true }).click();
+    await expect(connect).toBeEnabled();
+    await connect.click();
+    await expect(phone.getByText('Session connected', { exact: true })).toBeVisible({ timeout: 20000 });
+    await expect(desktop.getByRole('button', { name: 'Allow connection', exact: true })).toHaveCount(0);
+    await expect(phone.getByRole('region', { name: 'Skip Mac approval' })).toHaveCount(0);
+    await phone.getByRole('button', { name: 'Disconnect', exact: true }).click();
+    await expect(connect).toBeEnabled();
+
+    // Without a verified user, the Mac asks again.
+    await cdp.send('WebAuthn.setUserVerified', { authenticatorId, isUserVerified: false });
+    await connect.click();
+    await expect(desktop.getByRole('button', { name: 'Allow connection', exact: true })).toBeVisible();
+    await desktop.getByRole('button', { name: 'Decline', exact: true }).click();
+    await expect(connect).toBeEnabled();
+    await cdp.send('WebAuthn.setUserVerified', { authenticatorId, isUserVerified: true });
+
+    // Forget on the Mac: the next connection needs approval again.
+    await desktop.getByRole('button', { name: /^Forget / }).click();
+    await expect(desktop.getByText(/^Skips approval until /)).toHaveCount(0);
+    await connect.click();
+    await expect(desktop.getByRole('button', { name: 'Allow connection', exact: true })).toBeVisible();
+    await desktop.getByRole('button', { name: 'Decline', exact: true }).click();
   } finally { await desktopContext.close(); await phoneContext.close(); }
 });

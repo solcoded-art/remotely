@@ -3,8 +3,11 @@ import { sameService } from '../../shared/account-service.mjs';
 import { deviceIdentity, type Identity, type Pin } from './identity';
 import { request } from './api';
 import type { Auth, Command, Device, DriverEvent, RunningApp, ServerMessage, Signal } from './types';
+import { appIcons, LAUNCHERS } from './app-icons';
+import { assertUnlock, canUseUnlock, isUnlock, macRemember, phoneRemember, REMEMBER_MAX_MS, unlockKeyFor, unlockText, verifyUnlock, verifyUnlockKey, type UnlockKey } from './remember';
 
-type Session = { id: string; name: string; peerId: string; grantId: string; controllerNonce: string; desktopNonce?: string };
+/** `canRemember`: the phone can prove a device unlock. `unlocked`: the Mac verified one and is approving on its own. */
+type Session = { id: string; name: string; peerId: string; grantId: string; controllerNonce: string; desktopNonce?: string; canRemember?: boolean; unlocked?: boolean };
 type Invite = { id: string; secret: string; expires: number; link: string };
 type PairRequest = { id: string; peerId: string; key: trust.PublicKey; name: string };
 type PairCandidate = { inviteId: string; requestId: string; desktopId: string; key: trust.PublicKey; expires: number };
@@ -12,8 +15,10 @@ export type ConnectionSnapshot = {
   ready: boolean; status: 'offline' | 'connecting' | 'ready' | 'pending' | 'negotiating' | 'connected';
   pins: Record<string, Pin>; invite: Invite | null; pairing: PairRequest | null; pairStatus: string; devices: Device[]; pending: Session | null; session: Session | null; error: string;
   stream: MediaStream | null; apps: RunningApp[]; route: string; latency: number | null;
+  /** Phone: the Mac offers to skip approval until `until`, once this phone sets up its unlock passkey. */
+  rememberOffer: { until: number; challenge: string } | null;
 };
-const initial: ConnectionSnapshot = { ready: false, status: 'connecting', pins: {}, invite: null, pairing: null, pairStatus: '', devices: [], pending: null, session: null, error: '', stream: null, apps: [], route: '', latency: null };
+const initial: ConnectionSnapshot = { ready: false, status: 'connecting', pins: {}, invite: null, pairing: null, pairStatus: '', devices: [], pending: null, session: null, error: '', stream: null, apps: [], route: '', latency: null, rememberOffer: null };
 
 export class Connection {
   private value: ConnectionSnapshot = { ...initial };
@@ -46,8 +51,21 @@ export class Connection {
   private pairCandidate: PairCandidate | null = null;
   private inviteTimer?: ReturnType<typeof setTimeout>;
   private staleSession = '';
+  private iconQueue: string[] = [];
+  private iconPending = '';
+  private iconTimer?: ReturnType<typeof setTimeout>;
+  private readonly iconsRequested = new Set<string>();
+  /** Mac: set while the setup checklist is complete; only then may a remembered phone connect without a prompt. */
+  private autoApprove = false;
+  /** Mac: the remembered window chosen for the current session, waiting for the phone's passkey. */
+  private rememberPlan: { sessionId: string; controllerId: string; grantId: string; until: number; challenge: string } | null = null;
+  /** Mac: unlock proofs are single use. */
+  private readonly usedUnlocks = new Map<string, number>();
 
-  constructor(readonly auth: Auth) {}
+  constructor(readonly auth: Auth) { if (this.desktop) macRemember.open(new URL(auth.service).origin, auth.user.id); }
+  setAutoApprove = (value: boolean) => { this.autoApprove = value; };
+  /** Mac: stop skipping approval for every phone (sign-out) or one phone. */
+  forgetRemembered = (controllerId?: string) => { if (controllerId) macRemember.forget(controllerId); else macRemember.forgetAll(); };
   snapshot = () => this.value;
   subscribe = (fn: () => void) => { this.listeners.add(fn); return () => { this.listeners.delete(fn); }; };
   private update(data: Partial<ConnectionSnapshot>) { this.value = { ...this.value, ...data }; this.listeners.forEach(fn => fn()); }
@@ -142,9 +160,15 @@ export class Connection {
       if (data.type === 'request' && (!this.desktop || this.value.session || this.value.pending || !await trust.verify(pin.key, trust.sessionRequest(this.auth.user.id, pin.grantId, this.deviceId, data.peerId!, data.controllerNonce), data.requestSignature!))) {
         this.send({ type: 'end', sessionId: data.sessionId }); throw Error('The phone did not prove this connection request.');
       }
-      const session = { id: data.sessionId!, name: pin.name, peerId: data.peerId!, grantId: pin.grantId, controllerNonce: data.controllerNonce };
+      const session: Session = { id: data.sessionId!, name: pin.name, peerId: data.peerId!, grantId: pin.grantId, controllerNonce: data.controllerNonce, canRemember: data.type === 'request' && data.canRemember === true };
       if (data.type === 'pending') this.update({ session, status: 'pending', error: '' });
-      else this.update({ pending: session, error: '' });
+      else {
+        this.update({ pending: session, error: '' });
+        if (await this.verifiedUnlock(session, data.unlock) && this.value.pending?.id === session.id) {
+          this.update({ pending: { ...session, unlocked: true } });
+          void this.approve();
+        }
+      }
     }
     if (data.type === 'approved') {
       if (this.pc || this.desktop && !this.value.pending || !this.desktop && this.value.status !== 'pending') throw Error('Unexpected repeated session approval.');
@@ -222,6 +246,7 @@ export class Connection {
   revoke = async (peerId: string) => {
     try {
       const pin = (await this.identity.pins())[peerId]; if (!pin) return;
+      if (this.desktop) macRemember.forget(peerId); else phoneRemember.set(peerId, null);
       // Remove the local pin and end capture before asking the service to delete its grant.
       await this.identity.pin(peerId, null);
       if (this.value.session?.peerId === peerId || this.value.pending?.peerId === peerId) this.end();
@@ -250,6 +275,7 @@ export class Connection {
       if (this.desktop) {
         const pin = (await this.identity.pins())[grant.controllerId];
         if (!pin || pin.grantId !== grant.id || grant.desktopId !== this.deviceId || !await trust.verify(this.identity.publicKey, trust.grantText(grant), data.signature!)) throw Error('Unexpected pairing approval.');
+        macRemember.forget(grant.controllerId);
       } else {
         const candidate = this.pairCandidate;
         if (!candidate || candidate.expires <= Date.now() || grant.controllerId !== this.deviceId || grant.desktopId !== candidate.desktopId || grant.inviteId !== candidate.inviteId || grant.requestId !== candidate.requestId || await trust.keyId(grant.controllerKey) !== this.deviceId || await trust.keyId(grant.desktopKey) !== candidate.desktopId || !await trust.verify(candidate.key, trust.grantText(grant), data.signature!)) throw Error('Mac identity verification failed. Pairing was stopped.');
@@ -258,22 +284,63 @@ export class Connection {
       this.clearPairing(); this.update({ pins: await this.identity.pins(), pairStatus: 'Device paired. Every connection still needs approval on your Mac.' });
     }
     if (data.type === 'revoked') {
-      for (const [id, pin] of Object.entries(await this.identity.pins())) if (pin.grantId === data.grantId) await this.identity.pin(id, null);
+      if (this.desktop) macRemember.forgetGrant(data.grantId!);
+      for (const [id, pin] of Object.entries(await this.identity.pins())) if (pin.grantId === data.grantId) { await this.identity.pin(id, null); if (!this.desktop) phoneRemember.set(id, null); }
       if (this.value.session?.grantId === data.grantId || this.value.pending?.grantId === data.grantId) this.end();
       this.update({ pins: await this.identity.pins(), pairStatus: 'Device trust revoked. Pair again before connecting.' });
     }
   }
   connect = async (device: Device) => {
     if (this.connectAttempt || this.value.session) return;
+    const nonce = trust.nonce(); this.connectAttempt = { peerId: device.id, nonce };
     try {
+      // If this Mac remembers the phone, prove a fresh unlock. This must be the first await:
+      // the passkey prompt only opens while the tap that started it is still active.
+      let unlock;
+      const pinned = this.value.pins[device.id]; const key = phoneRemember.key();
+      if (pinned && key && phoneRemember.get(device.id, pinned.grantId)) {
+        try { unlock = await assertUnlock(trust.encode(unlockText(this.auth.user.id, device.id, this.deviceId, nonce)), key.credentialId); }
+        catch { /* cancelled or unavailable: the Mac asks for approval instead */ }
+      }
       const pin = (await this.identity.pins())[device.id];
       if (!pin) throw Error('Pair this phone with your Mac first.');
-      const nonce = trust.nonce(); this.connectAttempt = { peerId: device.id, nonce }; this.clearError();
+      this.clearError();
       const requestSignature = await this.identity.sign(trust.sessionRequest(this.auth.user.id, pin.grantId, device.id, this.deviceId, nonce));
-      this.send({ type: 'connect', targetId: device.id, controllerNonce: nonce, requestSignature });
+      this.send({ type: 'connect', targetId: device.id, controllerNonce: nonce, requestSignature, canRemember: await canUseUnlock(), ...(unlock ? { unlock } : {}) });
     } catch (error) { this.connectAttempt = null; this.report(error); }
   };
-  approve = async () => {
+  /** Mac: checks a remembered phone's unlock proof for this request. Each proof works once. */
+  private async verifiedUnlock(session: Session, unlock: unknown) {
+    if (!this.desktop || !this.autoApprove || !isUnlock(unlock)) return false;
+    const record = macRemember.active(session.peerId, session.grantId);
+    for (const [nonce, expires] of this.usedUnlocks) if (expires <= Date.now()) this.usedUnlocks.delete(nonce);
+    if (!record || unlock.credentialId !== record.credentialId || this.usedUnlocks.has(session.controllerNonce)) return false;
+    const challenge = trust.b64(trust.encode(unlockText(this.auth.user.id, this.deviceId, session.peerId, session.controllerNonce)));
+    if (!await verifyUnlock(record.publicKey, unlock, challenge, record.origin)) return false;
+    this.usedUnlocks.set(session.controllerNonce, record.until);
+    return true;
+  }
+  /** Phone: turns on reconnecting without approval. Call directly from a tap (opens Face ID). */
+  acceptRemember = async () => {
+    const offer = this.value.rememberOffer; if (!offer) return;
+    try {
+      const key = await unlockKeyFor(offer.challenge);
+      if (!this.sendData({ action: 'remember-key', ...key })) throw Error('Remote control is not connected.');
+    } catch (error) { this.report(error instanceof DOMException ? Error('Unlock was not completed. Try again.') : error); }
+  };
+  dismissRemember = () => this.update({ rememberOffer: null });
+  /** Mac: records the phone's passkey for the window chosen at approval. */
+  private async rememberKey(key: UnlockKey) {
+    const plan = this.rememberPlan; const session = this.value.session;
+    if (!plan || !session || plan.sessionId !== session.id || plan.controllerId !== session.peerId) return;
+    this.rememberPlan = null;
+    const origin = await verifyUnlockKey(key, plan.challenge);
+    if (!origin || this.value.session?.id !== plan.sessionId) { this.sendData({ action: 'error', error: 'The Mac could not verify this phone’s unlock. Approval is still required.' }); return; }
+    macRemember.set(plan.controllerId, { grantId: plan.grantId, credentialId: key.credentialId, publicKey: key.publicKey, origin, until: plan.until });
+    this.sendData({ action: 'remember-set', until: Math.min(plan.until, Date.now() + REMEMBER_MAX_MS) });
+  }
+  /** Mac: approves the pending request. `rememberMs` lets this phone reconnect without a prompt for that long (3 days at most). */
+  approve = async (rememberMs = 0) => {
     const pending = this.value.pending;
     if (!pending || !this.desktop) return;
     let stage: 'setup' | 'capture' = 'setup';
@@ -291,6 +358,8 @@ export class Connection {
       for (const track of this.capture.getTracks()) track.addEventListener('ended', () => this.end(), { once: true });
       this.update({ stream: this.capture });
       this.send({ type: 'approve', sessionId: pending.id, allowed: true, desktopNonce, approvalSignature });
+      // A remembered window starts at this approval. Reconnects within it never extend it.
+      this.rememberPlan = rememberMs > 0 && pending.canRemember && !pending.unlocked ? { sessionId: pending.id, controllerId: pending.peerId, grantId: pending.grantId, until: Date.now() + Math.min(rememberMs, REMEMBER_MAX_MS), challenge: trust.nonce() } : null;
     } catch (error) {
       if (this.value.pending?.id !== pending.id) return;
       const name = error instanceof Error ? error.name : '';
@@ -378,6 +447,8 @@ export class Connection {
       clearTimeout(this.negotiationTimer);
       this.update({ status: 'connected', error: '' });
       if (!this.desktop) this.sendCommand({ action: 'listApps' });
+      const plan = this.rememberPlan;
+      if (this.desktop && plan && plan.sessionId === this.value.session?.id) this.sendData({ action: 'remember-offer', until: plan.until, challenge: plan.challenge });
       this.readStats().catch(() => {});
       this.statsTimer = setInterval(() => this.readStats().catch(() => {}), 2000);
     };
@@ -391,6 +462,8 @@ export class Connection {
         const command = JSON.parse(event.data) as Command;
         if (this.desktop) {
           if (!this.value.session || !window.macRemote) return;
+          // Remembering is between the two apps; it never reaches the input driver.
+          if (command.action === 'remember-key') { void this.rememberKey(command as unknown as UnlockKey); return; }
           window.macRemote.command(this.value.session.id, command).catch(error => { this.sendData({ action: 'error', error: error.message }); });
         } else this.driverEvent(command as DriverEvent);
       } catch { this.report(Error('Invalid control message.')); }
@@ -399,7 +472,38 @@ export class Connection {
   private driverEvent(event: DriverEvent) {
     if (event.error || event.action === 'error') { this.report(Error(event.error || event.message || 'The Mac could not complete this action.')); }
     if (this.desktop) this.sendData(event);
-    else if (event.action === 'listApps' && event.apps) this.update({ apps: event.apps });
+    else if (event.action === 'listApps' && event.apps) {
+      this.update({ apps: event.apps });
+      // Macs that can send real icons say so; older Mac apps keep the letter tiles.
+      if (event.features?.includes('appIcon')) {
+        for (const bundleId of [...event.apps.map(app => app.bundleId), ...LAUNCHERS.map(app => app.bundleId)]) {
+          if (bundleId && !appIcons.has(bundleId) && !this.iconsRequested.has(bundleId)) { this.iconsRequested.add(bundleId); this.iconQueue.push(bundleId); }
+        }
+        this.requestNextIcon();
+      }
+    } else if (event.action === 'remember-offer') {
+      const offer = event as unknown as { until: unknown; challenge: unknown };
+      const until = Number(offer.until);
+      if (typeof offer.challenge !== 'string' || !Number.isFinite(until) || until <= Date.now() || until > Date.now() + REMEMBER_MAX_MS + 60_000) return;
+      try { if (trust.unb64(offer.challenge).length !== 32) return; } catch { return; }
+      const challenge = offer.challenge;
+      void canUseUnlock().then(ok => { if (ok && this.channel) this.update({ rememberOffer: { until, challenge } }); });
+    } else if (event.action === 'remember-set') {
+      const session = this.value.session; const until = Number((event as unknown as { until: unknown }).until);
+      if (session && Number.isFinite(until) && until > Date.now()) phoneRemember.set(session.peerId, { grantId: session.grantId, until: Math.min(until, Date.now() + REMEMBER_MAX_MS) });
+      this.update({ rememberOffer: null });
+    } else if (event.action === 'appIcon' && event.bundleId && event.bundleId === this.iconPending) {
+      appIcons.set(event.bundleId, event.icon);
+      this.iconPending = ''; clearTimeout(this.iconTimer); this.requestNextIcon();
+    }
+  }
+  /** One icon at a time, so icons never crowd out input on the data channel. */
+  private requestNextIcon() {
+    if (this.iconPending || !this.iconQueue.length) return;
+    const bundleId = this.iconQueue.shift()!;
+    if (!this.sendData({ action: 'appIcon', bundleId })) { this.iconQueue.unshift(bundleId); return; }
+    this.iconPending = bundleId;
+    this.iconTimer = setTimeout(() => { this.iconPending = ''; this.requestNextIcon(); }, 4000);
   }
   private sendData(value: unknown) {
     if (this.channel?.readyState !== 'open') return false;
@@ -429,6 +533,8 @@ export class Connection {
   }
   private cleanupPeer() {
     clearTimeout(this.negotiationTimer); clearInterval(this.statsTimer);
+    clearTimeout(this.iconTimer); this.iconQueue = []; this.iconPending = ''; this.iconsRequested.clear();
+    this.rememberPlan = null;
     const channel = this.channel; this.channel = null;
     if (channel) { channel.onclose = null; channel.onerror = null; channel.close(); }
     const pc = this.pc; this.pc = null;
@@ -436,7 +542,7 @@ export class Connection {
     this.capture?.getTracks().forEach(track => { track.onended = null; track.stop(); });
     this.capture = null; this.candidates = [];
     window.macRemote?.end().catch(() => {});
-    this.update({ stream: null, apps: [], route: '', latency: null });
+    this.update({ stream: null, apps: [], route: '', latency: null, rememberOffer: null });
   }
   /** True while an approved session's peer connection is up or recovering. */
   private peerAlive() { return !!this.value.session && !!this.pc && ['new', 'connecting', 'connected', 'disconnected'].includes(this.pc.connectionState); }

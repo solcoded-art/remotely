@@ -1,11 +1,14 @@
 import { useEffect, useState } from 'react';
 import QRCode from 'qrcode';
-import { Copy, Link2, ShieldCheck, Smartphone, Unplug } from 'lucide-react';
+import { Copy, History, Link2, ShieldCheck, Smartphone, Unplug } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import type { Connection, ConnectionSnapshot } from '@/lib/connection';
+import { useRememberedPhones } from '@/lib/remember';
+
+const formatUntil = (time: number) => new Date(time).toLocaleString(undefined, { weekday: 'short', hour: 'numeric', minute: '2-digit' });
 
 // Keep the secret only in memory while signing in; remove it from the address bar immediately.
 let scannedLink = location.hash.startsWith('#pair=') ? location.href : '';
@@ -16,6 +19,7 @@ export function DevicePairing({ connection, state }: { connection: Connection; s
   const [qr, setQR] = useState(''); const [copyStatus, setCopyStatus] = useState('');
   const [revokeId, setRevokeId] = useState<string | null>(null); const [busy, setBusy] = useState(false);
   const [autoPair, setAutoPair] = useState(!!link);
+  const remembered = useRememberedPhones();
   useEffect(() => {
     if (autoPair && state.ready && !connection.desktop) { setAutoPair(false); void connection.pair(link); setLink(''); }
   }, [autoPair, state.ready, connection, link]);
@@ -52,7 +56,7 @@ export function DevicePairing({ connection, state }: { connection: Connection; s
       <p className="mt-3 text-xs leading-6 text-muted-foreground">This installation uses a browser device key. Clearing site data or using a different browser requires pairing again. It is not a hardware-backed identity.</p>
     </>}
     <p role="status" className="mt-3 text-sm leading-6 text-muted-foreground">{copyStatus || state.pairStatus}</p>
-    {!!Object.keys(state.pins).length && <div className="mt-5 border-t border-border pt-4"><h3 className="font-medium mb-3">Paired {connection.desktop ? 'phones' : 'Macs'}</h3><ul className="space-y-3" aria-label="Trusted device keys">{Object.entries(state.pins).map(([id, pin]) => <li key={id} className="flex flex-wrap items-center justify-between gap-3"><div className="min-w-0 flex-1"><p className="text-sm">{pin.name}</p><details className="device-fingerprint"><summary>Device key</summary><code>{id.slice(2)}</code></details></div><Button variant="outline" size="sm" onClick={() => setRevokeId(id)} aria-label={`Revoke ${pin.name}`}><Unplug size={15} aria-hidden="true" />Revoke</Button></li>)}</ul></div>}
+    {!!Object.keys(state.pins).length && <div className="mt-5 border-t border-border pt-4"><h3 className="font-medium mb-3">Paired {connection.desktop ? 'phones' : 'Macs'}</h3><ul className="space-y-3" aria-label="Trusted device keys">{Object.entries(state.pins).map(([id, pin]) => <li key={id} className="flex flex-wrap items-center justify-between gap-3"><div className="min-w-0 flex-1"><p className="text-sm">{pin.name}</p>{connection.desktop && remembered[id]?.grantId === pin.grantId && remembered[id].until > Date.now() && <p className="text-xs text-muted-foreground">Skips approval until {formatUntil(remembered[id].until)}</p>}<details className="device-fingerprint"><summary>Device key</summary><code>{id.slice(2)}</code></details></div><div className="flex gap-2">{connection.desktop && remembered[id]?.grantId === pin.grantId && <Button variant="ghost" size="sm" onClick={() => connection.forgetRemembered(id)} aria-label={`Forget ${pin.name}`}><History size={15} aria-hidden="true" />Forget</Button>}<Button variant="outline" size="sm" onClick={() => setRevokeId(id)} aria-label={`Revoke ${pin.name}`}><Unplug size={15} aria-hidden="true" />Revoke</Button></div></li>)}</ul></div>}
     <Dialog open={!!revokeId} onOpenChange={open => { if (!open) setRevokeId(null); }}><DialogContent><DialogHeader><DialogTitle>Revoke this device?</DialogTitle><DialogDescription>Its active session will end. A new pairing link and approval on the Mac will be required to reconnect.</DialogDescription></DialogHeader><div className="setup-actions"><Button variant="destructive" disabled={busy} onClick={async () => { if (!revokeId) return; setBusy(true); try { await connection.revoke(revokeId); setRevokeId(null); } finally { setBusy(false); } }}>Revoke device</Button><Button variant="outline" onClick={() => setRevokeId(null)}>Cancel</Button></div></DialogContent></Dialog>
   </Card>;
 }

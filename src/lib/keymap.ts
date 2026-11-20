@@ -58,6 +58,8 @@ export const DEFAULT_HOTKEYS: Hotkey[] = [
   { id: 'spotlight', label: 'Spotlight', key: 'Space', modifiers: ['cmd'] },
   { id: 'switch-app', label: 'Switch app', key: 'Tab', modifiers: ['cmd'] },
   { id: 'prev-app', label: 'Previous app', key: 'Tab', modifiers: ['cmd', 'shift'] },
+  { id: 'next-window', label: 'Next window', key: '`', modifiers: ['cmd'] },
+  { id: 'prev-window', label: 'Previous window', key: '`', modifiers: ['cmd', 'shift'] },
   { id: 'copy', label: 'Copy', key: 'c', modifiers: ['cmd'] },
   { id: 'paste', label: 'Paste', key: 'v', modifiers: ['cmd'] },
   { id: 'cut', label: 'Cut', key: 'x', modifiers: ['cmd'] },

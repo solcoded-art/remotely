@@ -1,58 +1,101 @@
-import { useCallback, useImperativeHandle, useRef, useState, type ReactNode, type Ref } from 'react';
+import { useCallback, useEffect, useImperativeHandle, useRef, useState, type ReactNode, type Ref } from 'react';
 import type { Command } from '@/lib/types';
 import { toLocalDelta, toLocalPoint, useScreenSpace } from './screen-space';
 
+/** `scale` is relative to the resting view: 1 is fit (or fill, when filling). */
 export type ZoomApi = { zoomBy(factor: number): void; reset(): void; scale: number };
 type View = { s: number; x: number; y: number };
-const MAX_SCALE = 5;
+/** The Mac frame inside the unscaled content, after the video's letterboxing. */
+type Frame = { x: number; y: number; w: number; h: number };
+const MAX_ZOOM = 5;
 
 /**
- * The streamed Mac screen. Pinch or ⌘ +/− to zoom, drag to pan when zoomed,
- * tap to click there, long-press to right-click.
+ * The streamed Mac screen. Pinch or ⌘ +/− to zoom, drag to pan, tap to click there,
+ * long-press to right-click. With `fill`, the resting view covers the whole stage and
+ * the rest of the Mac screen is a pan away. Panning never shows letterbox bars.
  */
-export function PanZoomScreen({ children, enabled, send, zoomRef, onZoomChange }: { children: ReactNode; enabled: boolean; send(command: Command): boolean; zoomRef?: Ref<ZoomApi>; onZoomChange?(scale: number): void }) {
+export function PanZoomScreen({ children, enabled, fill = false, covered = 0, send, zoomRef, onZoomChange }: { children: ReactNode; enabled: boolean; fill?: boolean; /** Stage pixels hidden under controls at the bottom; panning can lift the screen above them. */ covered?: number; send(command: Command): boolean; zoomRef?: Ref<ZoomApi>; onZoomChange?(scale: number): void }) {
   const { rotated } = useScreenSpace();
   const stage = useRef<HTMLDivElement>(null); const content = useRef<HTMLDivElement>(null);
   const [view, setViewState] = useState<View>({ s: 1, x: 0, y: 0 });
   const viewRef = useRef(view);
+  const minRef = useRef(1);
+  const reported = useRef(1);
+  const coveredRef = useRef(covered); coveredRef.current = covered;
   const pointers = useRef(new Map<number, { x: number; y: number }>());
   const gesture = useRef({ start: 0, moved: 0, pinched: false, distance: 0, mid: [0, 0] as [number, number], longPress: 0 as ReturnType<typeof setTimeout> | 0, origin: [0, 0] as [number, number] });
 
+  const frame = useCallback((): Frame | null => {
+    const video = content.current?.querySelector('video');
+    if (!video?.videoWidth || !video.videoHeight || !video.offsetWidth || !video.offsetHeight) return null;
+    let ox = 0, oy = 0;
+    for (let node: HTMLElement | null = video; node && node !== content.current; node = node.offsetParent as HTMLElement | null) { ox += node.offsetLeft; oy += node.offsetTop; }
+    const fit = Math.min(video.offsetWidth / video.videoWidth, video.offsetHeight / video.videoHeight);
+    const w = video.videoWidth * fit, h = video.videoHeight * fit;
+    return { x: ox + (video.offsetWidth - w) / 2, y: oy + (video.offsetHeight - h) / 2, w, h };
+  }, []);
+
   const setView = useCallback((next: View) => {
     const el = stage.current; if (!el) return;
-    const s = Math.min(MAX_SCALE, Math.max(1, next.s));
-    const w = el.offsetWidth, h = el.offsetHeight;
-    const clamped = { s, x: Math.min(0, Math.max(w - w * s, next.x)), y: Math.min(0, Math.max(h - h * s, next.y)) };
-    if (s === 1) { clamped.x = 0; clamped.y = 0; }
-    if (clamped.s !== viewRef.current.s) onZoomChange?.(clamped.s);
+    const W = el.offsetWidth, H = Math.max(1, el.offsetHeight - coveredRef.current), min = minRef.current;
+    const s = Math.min(MAX_ZOOM * min, Math.max(min, next.s));
+    const f = frame() ?? { x: 0, y: 0, w: W, h: H };
+    // Keep the frame covering the visible stage on any axis where it is larger; center it otherwise.
+    const axis = (pos: number, size: number, start: number, length: number) => length * s >= size - 0.5
+      ? Math.min(-start * s, Math.max(size - (start + length) * s, pos))
+      : (size - length * s) / 2 - start * s;
+    const clamped = { s, x: axis(next.x, W, f.x, f.w), y: axis(next.y, H, f.y, f.h) };
+    const relative = s / min;
+    if (Math.abs(relative - reported.current) > 1e-3) { reported.current = relative; onZoomChange?.(relative); }
     viewRef.current = clamped; setViewState(clamped);
-  }, [onZoomChange]);
+  }, [frame, onZoomChange]);
+
+  /** The view at scale s centered on the Mac frame. */
+  const centered = useCallback((s: number): View => {
+    const el = stage.current!; const f = frame() ?? { x: 0, y: 0, w: el.offsetWidth, h: el.offsetHeight };
+    return { s, x: el.offsetWidth / 2 - (f.x + f.w / 2) * s, y: (el.offsetHeight - coveredRef.current) / 2 - (f.y + f.h / 2) * s };
+  }, [frame]);
 
   /** Zooms keeping the stage point (px, py) fixed. */
   const zoomAt = useCallback((factor: number, px?: number, py?: number) => {
     const el = stage.current; if (!el) return;
-    const { s, x, y } = viewRef.current;
+    const { s, x, y } = viewRef.current; const min = minRef.current;
     const cx = px ?? el.offsetWidth / 2, cy = py ?? el.offsetHeight / 2;
-    const next = Math.min(MAX_SCALE, Math.max(1, s * factor));
+    const next = Math.min(MAX_ZOOM * min, Math.max(min, s * factor));
     setView({ s: next, x: cx - (cx - x) * next / s, y: cy - (cy - y) * next / s });
   }, [setView]);
 
-  useImperativeHandle(zoomRef, () => ({ zoomBy: factor => zoomAt(factor), reset: () => setView({ s: 1, x: 0, y: 0 }), scale: view.s }), [zoomAt, setView, view.s]);
+  // The resting scale follows the stage size, the stream's shape and fit/fill.
+  useEffect(() => {
+    const el = stage.current; if (!el) return;
+    const video = content.current?.querySelector('video');
+    const update = () => {
+      const f = frame(); const W = el.offsetWidth, H = el.offsetHeight;
+      const previous = minRef.current;
+      const atRest = viewRef.current.s <= previous * 1.001;
+      minRef.current = fill && f && W && H ? Math.max(1, W / f.w, H / f.h) : 1;
+      setView(atRest ? centered(minRef.current) : viewRef.current);
+    };
+    update();
+    const observer = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(update);
+    observer?.observe(el);
+    video?.addEventListener('loadedmetadata', update); video?.addEventListener('resize', update);
+    return () => { observer?.disconnect(); video?.removeEventListener('loadedmetadata', update); video?.removeEventListener('resize', update); };
+  }, [fill, frame, centered, setView]);
+  // Controls opening or closing over the screen re-clamp the view so nothing stays hidden under them.
+  useEffect(() => { setView(viewRef.current); }, [covered, setView]);
+
+  useImperativeHandle(zoomRef, () => ({ zoomBy: factor => zoomAt(factor), reset: () => setView(centered(minRef.current)), scale: view.s / minRef.current }), [zoomAt, setView, centered, view.s]);
 
   const local = (clientX: number, clientY: number) => toLocalPoint(rotated, stage.current!, clientX, clientY);
 
   /** Sends a click at a stage point, mapped through zoom and the video's letterboxing. */
   function clickAt([lx, ly]: [number, number], button: 'left' | 'right') {
-    const video = content.current?.querySelector('video');
-    if (!enabled || !video?.videoWidth || !video.videoHeight) return;
+    const f = frame(); if (!enabled || !f) return;
     const { s, x, y } = viewRef.current;
-    let cx = (lx - x) / s, cy = (ly - y) / s;
-    for (let node: HTMLElement | null = video; node && node !== content.current; node = node.offsetParent as HTMLElement | null) { cx -= node.offsetLeft; cy -= node.offsetTop; }
-    const fit = Math.min(video.offsetWidth / video.videoWidth, video.offsetHeight / video.videoHeight);
-    const width = video.videoWidth * fit, height = video.videoHeight * fit;
-    const vx = cx - (video.offsetWidth - width) / 2, vy = cy - (video.offsetHeight - height) / 2;
-    if (vx < 0 || vy < 0 || vx > width || vy > height) return;
-    if (send({ action: 'moveTo', normX: vx / width, normY: vy / height })) send({ action: 'click', button });
+    const cx = (lx - x) / s - f.x, cy = (ly - y) / s - f.y;
+    if (cx < 0 || cy < 0 || cx > f.w || cy > f.h) return;
+    if (send({ action: 'moveTo', normX: cx / f.w, normY: cy / f.h })) send({ action: 'click', button });
   }
 
   const cancelLongPress = () => { if (gesture.current.longPress) clearTimeout(gesture.current.longPress); gesture.current.longPress = 0; };
@@ -72,7 +115,7 @@ export function PanZoomScreen({ children, enabled, send, zoomRef, onZoomChange }
     onPointerDown={event => {
       if (event.pointerType === 'mouse' && event.button !== 0) return;
       if ((event.target as HTMLElement).closest('button, a, input')) return;
-      event.currentTarget.setPointerCapture(event.pointerId);
+      try { event.currentTarget.setPointerCapture(event.pointerId); } catch { /* synthetic pointer */ }
       pointers.current.set(event.pointerId, { x: event.clientX, y: event.clientY });
       if (pointers.current.size === 1) {
         const origin = local(event.clientX, event.clientY);
@@ -89,16 +132,19 @@ export function PanZoomScreen({ children, enabled, send, zoomRef, onZoomChange }
       pointers.current.set(event.pointerId, { x: event.clientX, y: event.clientY });
       if (pointers.current.size >= 2) {
         const { distance, mid } = pinchState(); const g = gesture.current;
-        const { s, x, y } = viewRef.current;
-        const next = Math.min(MAX_SCALE, Math.max(1, s * (distance / (g.distance || distance))));
+        const { s, x, y } = viewRef.current; const min = minRef.current;
+        const next = Math.min(MAX_ZOOM * min, Math.max(min, s * (distance / (g.distance || distance))));
         // Scale about the previous midpoint, then follow the midpoint's movement.
         setView({ s: next, x: mid[0] - (g.mid[0] - x) * next / s, y: mid[1] - (g.mid[1] - y) * next / s });
         g.distance = distance; g.mid = mid; return;
       }
       const [dx, dy] = toLocalDelta(rotated, event.clientX - previous.x, event.clientY - previous.y);
       gesture.current.moved += Math.abs(dx) + Math.abs(dy);
-      if (gesture.current.moved > 8) cancelLongPress();
-      if (viewRef.current.s > 1 && gesture.current.moved > 8) setView({ ...viewRef.current, x: viewRef.current.x + dx, y: viewRef.current.y + dy });
+      if (gesture.current.moved > 8) {
+        cancelLongPress();
+        // Pans whenever part of the Mac frame is off-stage (zoomed in, or filling).
+        setView({ ...viewRef.current, x: viewRef.current.x + dx, y: viewRef.current.y + dy });
+      }
     }}
     onPointerUp={event => {
       if (!pointers.current.delete(event.pointerId)) return;

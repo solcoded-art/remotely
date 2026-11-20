@@ -22,6 +22,7 @@ import { request } from '@/lib/api';
 import { Connection } from '@/lib/connection';
 import { MacSetupHelp } from '@/components/MacSetup';
 import { SettingsDialog } from '@/components/SettingsDialog';
+import { ApprovalCard } from '@/components/ApprovalCard';
 import type { Auth } from '@/lib/types';
 
 const BACKGROUND_LIMIT_MS = 5 * 60_000;
@@ -39,8 +40,9 @@ function PhoneSetupSteps() {
 function Workspace({ auth, logout, accountError = '' }: { auth: Auth; logout(): void; accountError?: string }) {
   const connection = useMemo(() => new Connection(auth), [auth]);
   const state = useSyncExternalStore(connection.subscribe, connection.snapshot);
-  const [approving, setApproving] = useState(false);
   const [desktopReady, setDesktopReady] = useState(false);
+  // A remembered phone reconnects without a prompt only while the Mac setup is complete.
+  useEffect(() => { connection.setAutoApprove(connection.desktop && desktopReady); }, [connection, desktopReady]);
   const heading = useRef<HTMLHeadingElement>(null);
   const desktop = connection.desktop;
   const connected = state.status === 'connected';
@@ -57,7 +59,7 @@ function Workspace({ auth, logout, accountError = '' }: { auth: Auth; logout(): 
     document.addEventListener('visibilitychange', changed);
     return () => { clearTimeout(timer); document.removeEventListener('visibilitychange', changed); };
   }, [connection]);
-  const signOut = () => { connection.end(); logout(); };
+  const signOut = () => { connection.end(); if (desktop) connection.forgetRemembered(); logout(); };
   const accountLabel = state.ready ? 'Signed in' : state.status === 'connecting' ? 'Connecting account…' : 'Account disconnected';
   return <AppShell actions={<><span className="account-label muted">{auth.user.email}</span>{!desktop && <MacSetupHelp />}<SettingsDialog auth={auth} logout={signOut} /></>}>
     <main className={`page ${remoteView ? 'remote-main' : ''}`} id="main-content" tabIndex={-1}>
@@ -65,7 +67,7 @@ function Workspace({ auth, logout, accountError = '' }: { auth: Auth; logout(): 
       {accountError && <StatusNotice title="Account needs attention" error>{accountError}</StatusNotice>}
       {state.error && <StatusNotice title="Something needs attention" error dismiss={connection.clearError}>{state.error}</StatusNotice>}
       {!state.ready && state.status === 'offline' && <StatusNotice title="Account connection interrupted"><p>Your desktop session has stopped. Check your network, retry, or sign in again.</p><div className="setup-actions"><Button variant="outline" onClick={connection.retry}>Retry connection</Button><Button variant="ghost" onClick={signOut}>Sign out</Button></div></StatusNotice>}
-      {state.pending && desktop && <Card className="approval-card" aria-labelledby="approval-title"><div role="status" aria-atomic="true" className="flex items-start gap-3"><Smartphone className="text-primary" aria-hidden="true" /><div><h2 id="approval-title" className="text-lg font-medium">{state.pending.name} wants to connect</h2><p className="mt-1 text-sm leading-6 text-muted-foreground">Paired with this Mac using its device key. Allowing this request shares your selected display and enables mouse and keyboard control.</p></div></div>{!desktopReady && <p className="text-sm text-muted-foreground">Complete the Mac setup checklist below before allowing this request.</p>}<div className="setup-actions"><Button disabled={approving || !desktopReady} onClick={async () => { setApproving(true); try { await connection.approve(); } finally { setApproving(false); } }}>{approving && <Loader2 className="animate-spin" aria-hidden="true" />}Allow connection</Button><Button variant="outline" disabled={approving} onClick={connection.decline}>Decline</Button></div></Card>}
+      {state.pending && desktop && <ApprovalCard key={state.pending.id} connection={connection} pending={state.pending} ready={desktopReady} />}
       {remoteView ? <RemoteSession key={state.session!.id} connection={connection} state={state} /> : <div className={`dashboard-grid ${desktop ? '' : 'devices-only'}`}><div className="min-w-0">
         {desktop ? <><DevicePairing connection={connection} state={state} /><DesktopSetup accountReady={state.ready} busy={!!state.session} onReadyChange={setDesktopReady} />{state.session && <Card className="journey-card mt-5"><div className="session-actions"><p>{state.session.name} · {connected ? 'Connected' : 'Connecting…'}</p><Button variant="destructive" onClick={connection.end}>End session</Button></div><Viewer connection={connection} stream={state.stream} desktop /></Card>}</> : <>{!!Object.keys(state.pins).length && <DevicesPanel devices={state.devices} ready={state.ready} pins={state.pins} connect={connection.connect} />}<DevicePairing key="device-pairing" connection={connection} state={state} />{!Object.keys(state.pins).length && <DevicesPanel devices={state.devices} ready={state.ready} pins={state.pins} connect={connection.connect} />}</>}
       </div>{desktop && <PhoneSetupSteps />}</div>}

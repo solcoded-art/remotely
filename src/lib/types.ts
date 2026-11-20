@@ -6,11 +6,12 @@ export type Device = { id: string; name: string; kind: 'desktop' | 'controller';
 export type RunningApp = { pid: number; name: string; bundleId: string; active: boolean };
 export type DisplaySource = { id: string; displayId: string; name: string; thumbnail: string };
 export type Permissions = { accessibility: boolean; screen: string };
-export type DriverEvent = { action: string; requestId?: string; apps?: RunningApp[]; error?: string; message?: string; ok?: boolean };
+export type DriverEvent = { action: string; requestId?: string; apps?: RunningApp[]; features?: string[]; bundleId?: string; icon?: string | null; error?: string; message?: string; ok?: boolean };
 export type Command = Record<string, unknown> & { action: string };
 export type Signal = { type: 'offer' | 'answer'; sdp: string } | { type: 'ice'; candidate: RTCIceCandidateInit };
 export type ServerMessage = {
   type: string; controllerNonce?: string; desktopNonce?: string; requestSignature?: string; approvalSignature?: string; challenge?: string; peerId?: string; grantId?: string; inviteId?: string; requestId?: string; expires?: number; proof?: string; publicKey?: PublicKey; grant?: Grant; signature?: string; seq?: number; devices?: Device[]; sessionId?: string; name?: string; reason?: string; message?: string; signal?: Signal;
+  canRemember?: boolean; unlock?: import('./remember').Unlock;
 };
 declare global {
   interface Window {
