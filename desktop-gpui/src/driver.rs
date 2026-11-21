@@ -94,7 +94,7 @@ impl Driver {
         }
         thread::spawn(move || {
             for line in BufReader::new(stderr).lines().map_while(Result::ok) {
-                eprintln!("[driver] {line}");
+                crate::log::log(format!("driver: {line}"));
             }
         });
         Ok(Self { child: Some(child), sender: Some(sender), pending, alive })

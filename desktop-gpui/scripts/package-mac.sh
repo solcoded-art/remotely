@@ -5,6 +5,10 @@
 # macOS 13+. Like the Electron 0.3.x releases it is ad-hoc signed and not
 # notarized (developer beta). Publishing the zip and pointing release.config.json
 # at it are separate, manual steps; see docs/gpui-desktop.md.
+#
+# MAC_REMOTE_SIGN_IDENTITY signs a local test copy with a stable identity instead
+# (e.g. the "Mac Remote GPUI Dev" certificate), so macOS keeps its permissions
+# across rebuilds. Releases are always ad-hoc.
 set -eu
 here=$(cd "$(dirname "$0")/.." && pwd)
 repo=$(cd "$here/.." && pwd)
@@ -57,8 +61,9 @@ PLIST
 plutil -lint "$app/Contents/Info.plist" >/dev/null
 
 # Inside-out ad-hoc signatures with the hardened runtime; no entitlements are needed.
-codesign --force --options runtime --sign - --identifier com.macremote.companion.driver "$app/Contents/Resources/mac_driver"
-codesign --force --options runtime --sign - "$app"
+identity=${MAC_REMOTE_SIGN_IDENTITY:--}
+codesign --force --options runtime --sign "$identity" --identifier com.macremote.companion.driver "$app/Contents/Resources/mac_driver"
+codesign --force --options runtime --sign "$identity" "$app"
 codesign --verify --deep --strict "$app"
 [ "$(lipo -archs "$app/Contents/MacOS/Mac Remote")" = arm64 ]
 [ "$(lipo -archs "$app/Contents/Resources/mac_driver")" = arm64 ]

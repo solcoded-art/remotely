@@ -226,6 +226,9 @@ button[data-slot="button"] { border-radius: 10px; }
 .tool-zoom { width: auto; padding: 0 8px; font-size: .75rem; font-variant-numeric: tabular-nums; }
 .session-screen { position: sticky; top: max(8px, env(safe-area-inset-top), var(--remote-viewport-top, 0px)); z-index: 20; min-width: 0; overflow: hidden; border: 1px solid #2a2d3c; border-radius: 16px; background: #050507; box-shadow: 0 16px 40px #0006; }
 .session-screen .viewer { border: 0; border-radius: 0; background: #050507; max-height: calc(var(--remote-visible-height, 100dvh) * .6); }
+/* Fullscreen session: the page itself never scrolls, bounces or zooms. */
+html.session-locked, html.session-locked body { overflow: hidden; overscroll-behavior: none; height: 100%; }
+html.session-locked .remote-session[data-fullscreen] { touch-action: none; }
 .panzoom-stage { position: relative; overflow: hidden; touch-action: none; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; }
 .panzoom-content { position: relative; transform-origin: 0 0; will-change: transform; }
 .session-controls { container: dock / inline-size; display: grid; gap: 6px; min-width: 0; }

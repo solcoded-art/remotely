@@ -121,6 +121,29 @@ export function RemoteSession({ connection, state }: { connection: Connection; s
     return () => { changed.forEach(element => element.removeAttribute('inert')); document.removeEventListener('keydown', escape); };
   }, [fullscreen, exitFullscreen]);
 
+  // Fullscreen is locked in place: on iPhone there is no real fullscreen, so stop
+  // Safari from scrolling, rubber-banding or pinch-zooming the page itself. Gestures
+  // on the screen and trackpad are pointer events and keep working; lists that
+  // scroll (dock apps, shortcuts) still scroll.
+  useEffect(() => {
+    if (!fullscreen) return;
+    const html = document.documentElement;
+    html.classList.add('session-locked');
+    const block = (event: Event) => event.preventDefault();
+    const touchMove = (event: TouchEvent) => {
+      const scroller = (event.target as Element | null)?.closest?.('.app-dock, .kb-shortcuts');
+      if (event.touches.length > 1 || !scroller) event.preventDefault();
+    };
+    const options = { passive: false } as const;
+    for (const type of ['gesturestart', 'gesturechange', 'gestureend']) document.addEventListener(type, block, options);
+    document.addEventListener('touchmove', touchMove, options);
+    return () => {
+      html.classList.remove('session-locked');
+      for (const type of ['gesturestart', 'gesturechange', 'gestureend']) document.removeEventListener(type, block);
+      document.removeEventListener('touchmove', touchMove);
+    };
+  }, [fullscreen]);
+
   // In fullscreen the open dock overlays the bottom of the screen; tell the zoom how much it hides.
   useEffect(() => {
     const element = controls.current;

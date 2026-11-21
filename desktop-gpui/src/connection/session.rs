@@ -113,6 +113,9 @@ pub struct Desktop {
     remember_plan: Option<RememberPlan>,
     /// The window picked on the prompt for the approval in progress.
     approving_remember_ms: i64,
+    permission_task: Option<Task<()>>,
+    /// This session's commands passed to the driver, by action (`type` counts characters too), and refusals.
+    input_counts: BTreeMap<String, u64>,
 }
 
 impl Connection {
@@ -137,6 +140,25 @@ impl Connection {
         })
         .detach();
         self.check_permissions(false, cx);
+        // Pick up permissions granted in System Settings without a button press.
+        self.desktop.permission_task = Some(cx.spawn(async move |this, cx| loop {
+            cx.background_executor().timer(Duration::from_secs(2)).await;
+            let alive = this
+                .update(cx, |this, cx| {
+                    let d = &this.desktop;
+                    if !d.accessibility || !d.screen {
+                        let before = (d.accessibility, d.screen);
+                        this.check_permissions(false, cx);
+                        if (this.desktop.accessibility, this.desktop.screen) != before {
+                            crate::log::log(format!("permissions now: accessibility {}, screen recording {}", this.desktop.accessibility, this.desktop.screen));
+                        }
+                    }
+                })
+                .is_ok();
+            if !alive {
+                break;
+            }
+        }));
     }
 
     /// Re-reads Accessibility and Screen Recording. `prompt` opens the Accessibility dialog.
@@ -616,7 +638,8 @@ impl Connection {
                     encoder.request_keyframe();
                 }
             }
-            PeerEvent::ChannelMessage(text) => self.channel_message(text, cx),
+            // Input changes nothing on screen: no redraw per message (errors redraw via report).
+            PeerEvent::ChannelMessage(text) => return self.channel_message(text, cx),
             PeerEvent::ChannelClosed => self.end(cx),
         }
         cx.notify();
@@ -686,6 +709,17 @@ impl Connection {
             }
             self.desktop.driver.as_ref().ok_or_else(|| anyhow!("The input driver is unavailable. Restart the companion."))?.write(&valid)
         });
+        let action = s(&command, "action").to_string();
+        let counts = &mut self.desktop.input_counts;
+        match &result {
+            Ok(()) => {
+                *counts.entry(action.clone()).or_default() += 1;
+                if action == "type" {
+                    *counts.entry("characters".into()).or_default() += s(&command, "text").chars().count() as u64;
+                }
+            }
+            Err(_) => *counts.entry("refused".into()).or_default() += 1,
+        }
         if let Err(err) = result {
             crate::log::log(format!("command {} refused: {err}", s(&command, "action")));
             self.send_data(&json!({ "action": "error", "error": err.to_string() }));
@@ -759,6 +793,10 @@ impl Connection {
     /// Stops capture, encoder and peer, and lifts any held mouse buttons.
     pub(super) fn cleanup_media(&mut self) {
         let d = &mut self.desktop;
+        if !d.input_counts.is_empty() {
+            let summary: Vec<String> = std::mem::take(&mut d.input_counts).into_iter().map(|(k, v)| format!("{k} {v}")).collect();
+            crate::log::log(format!("session input passed to the driver: {}", summary.join(", ")));
+        }
         d.negotiation_task = None;
         d.peer_generation += 1;
         if let Some(peer) = d.peer.take() {
