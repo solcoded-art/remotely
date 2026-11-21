@@ -1,0 +1,69 @@
+{
+  "privateKey": "_FqakcFH5J7zVWlSXIozzP_PAY90fVUOG6d-e1w99YU",
+  "publicKey": {
+    "crv": "P-256",
+    "kty": "EC",
+    "x": "kZUR-xQ6MDbrcHqUV1YUDLv-3hjHv2UyeNF36SmEerw",
+    "y": "jh-PojJslrkZ6LNk4eI0qm1MVzK2Luz6DKU8lRt2Eg4"
+  },
+  "keyId": "d_A0MXdbdUVvEYuKIYGwWG2A57VLchu_SpeORKRi9c-C8",
+  "tricky": "Eí’s “Mac” \\ / \n\t\u0001   😀 <tag>&",
+  "challenge": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+  "nonceA": "BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB",
+  "nonceB": "CCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC",
+  "secret": "S2VlcCB0aGlzIHNlY3JldCBmb3IgdGVzdHMgb25seSE",
+  "grant": {
+    "id": "grant-0001",
+    "userId": "user-0001",
+    "desktopId": "d_A0MXdbdUVvEYuKIYGwWG2A57VLchu_SpeORKRi9c-C8",
+    "controllerId": "d_phone",
+    "desktopKey": {
+      "crv": "P-256",
+      "kty": "EC",
+      "x": "kZUR-xQ6MDbrcHqUV1YUDLv-3hjHv2UyeNF36SmEerw",
+      "y": "jh-PojJslrkZ6LNk4eI0qm1MVzK2Luz6DKU8lRt2Eg4"
+    },
+    "controllerKey": {
+      "crv": "P-256",
+      "kty": "EC",
+      "x": "kZUR-xQ6MDbrcHqUV1YUDLv-3hjHv2UyeNF36SmEerw",
+      "y": "jh-PojJslrkZ6LNk4eI0qm1MVzK2Luz6DKU8lRt2Eg4"
+    },
+    "inviteId": "invite-0001",
+    "requestId": "request-0001"
+  },
+  "data": {
+    "type": "pair-open",
+    "inviteId": "invite-0001",
+    "expires": 1767225600000
+  },
+  "signal": {
+    "type": "ice",
+    "candidate": {
+      "candidate": "candidate:1 1 udp 2122260223 192.0.2.1 54321 typ host",
+      "sdpMid": "0",
+      "sdpMLineIndex": 0
+    }
+  },
+  "transcripts": {
+    "registration": "[\"remotely-trust-v1\",\"register\",\"AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA\",\"user-0001\",\"d_A0MXdbdUVvEYuKIYGwWG2A57VLchu_SpeORKRi9c-C8\",\"Eí’s “Mac” \\\\ / \\n\\t\\u0001   😀 <tag>&\",\"desktop\",{\"crv\":\"P-256\",\"kty\":\"EC\",\"x\":\"kZUR-xQ6MDbrcHqUV1YUDLv-3hjHv2UyeNF36SmEerw\",\"y\":\"jh-PojJslrkZ6LNk4eI0qm1MVzK2Luz6DKU8lRt2Eg4\"}]",
+    "hello": "[\"remotely-trust-v1\",\"hello\",\"AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA\",\"user-0001\",\"d_A0MXdbdUVvEYuKIYGwWG2A57VLchu_SpeORKRi9c-C8\"]",
+    "envelope": "[\"remotely-trust-v1\",\"message\",\"AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA\",\"user-0001\",\"d_A0MXdbdUVvEYuKIYGwWG2A57VLchu_SpeORKRi9c-C8\",7,{\"type\":\"pair-open\",\"inviteId\":\"invite-0001\",\"expires\":1767225600000}]",
+    "pairing": "[\"remotely-trust-v1\",\"pair\",\"invite-0001\",\"request-0001\",\"user-0001\",\"d_A0MXdbdUVvEYuKIYGwWG2A57VLchu_SpeORKRi9c-C8\",\"d_phone\",{\"crv\":\"P-256\",\"kty\":\"EC\",\"x\":\"kZUR-xQ6MDbrcHqUV1YUDLv-3hjHv2UyeNF36SmEerw\",\"y\":\"jh-PojJslrkZ6LNk4eI0qm1MVzK2Luz6DKU8lRt2Eg4\"}]",
+    "grant": "[\"remotely-trust-v1\",\"grant\",\"grant-0001\",\"user-0001\",\"d_A0MXdbdUVvEYuKIYGwWG2A57VLchu_SpeORKRi9c-C8\",\"d_phone\",{\"crv\":\"P-256\",\"kty\":\"EC\",\"x\":\"kZUR-xQ6MDbrcHqUV1YUDLv-3hjHv2UyeNF36SmEerw\",\"y\":\"jh-PojJslrkZ6LNk4eI0qm1MVzK2Luz6DKU8lRt2Eg4\"},{\"crv\":\"P-256\",\"kty\":\"EC\",\"x\":\"kZUR-xQ6MDbrcHqUV1YUDLv-3hjHv2UyeNF36SmEerw\",\"y\":\"jh-PojJslrkZ6LNk4eI0qm1MVzK2Luz6DKU8lRt2Eg4\"},\"invite-0001\",\"request-0001\"]",
+    "sessionRequest": "[\"remotely-trust-v1\",\"session-request\",\"user-0001\",\"grant-0001\",\"d_A0MXdbdUVvEYuKIYGwWG2A57VLchu_SpeORKRi9c-C8\",\"d_phone\",\"BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB\"]",
+    "sessionApproval": "[\"remotely-trust-v1\",\"session-approval\",\"session-0001\",\"user-0001\",\"grant-0001\",\"d_A0MXdbdUVvEYuKIYGwWG2A57VLchu_SpeORKRi9c-C8\",\"d_phone\",\"BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB\",\"CCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC\"]",
+    "signal": "[\"remotely-trust-v1\",\"signal\",\"session-0001\",\"grant-0001\",\"d_A0MXdbdUVvEYuKIYGwWG2A57VLchu_SpeORKRi9c-C8\",\"BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB.CCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC\",3,{\"type\":\"ice\",\"candidate\":{\"candidate\":\"candidate:1 1 udp 2122260223 192.0.2.1 54321 typ host\",\"sdpMid\":\"0\",\"sdpMLineIndex\":0}}]"
+  },
+  "signatures": {
+    "registration": "jI-R0q_NpxRRQ3zMrt2D-RB18_PLz8OrHNl5pqEcEgTnHkNE5wrt6kYgR5yC8fbZFkmOBjpagP87YS_0d_uUXw",
+    "hello": "J9nwYcnnl1QW2WjYCAU8dr5nbWm_6Sjz9pShU6OgGZ67sX76jhx3lXzL9qQhnuUSkF-mobx3d_tsPVSZu339OQ",
+    "envelope": "8o2TBU3rO_RCAi8JboMG0JX-1J-ZH7cEEQC99fHuMpRUM4vZ0O8J7aqMHMxV0jpyZ1bcbO3hYzjTkCbb2VRfIQ",
+    "pairing": "lSfDffgDxeOPLyYfUSuXRvRtAuEuS8T0ew90kMw1aol4LH9Ogo82az8ZHqZZY2YaFrLWuYFCUFw3KoKhgBTxwQ",
+    "grant": "mkHeKrFE78MeJzyVsxp5bjr24mX5oRIA1vLPZh0n90fCjQZUO3wc62H5EyK3Anok6Ayd7rLJYz7hCtYY4vjQwQ",
+    "sessionRequest": "YAoRtIFjNl1QbJIb8-xFluRd7vsRs4zziBtm2W8LobwYebv6CTYrCacLUPaufm0Rs0urqZGY7EmVl2GoKU0IcQ",
+    "sessionApproval": "L6geQE4BsvFhQINCufaqGoWPptvBzLMGkTudXMt3MkFxO0Z8fyVT2Qw0YkHlEHozKOP-yFLxtAgjspgPtgSTAw",
+    "signal": "U9JQgPRW8RJGqAa4mNt4OhZFYjgaWWfgAPWk3GHABs5L1MO2PtxSby4JPOp5YBpKQ-GOqUe0C5sPeJs5SiNUhA"
+  },
+  "proof": "wv5QupCgqS7AOY4bk74PRxy8CzEWI2o2qcOZ3Ee5Vdg"
+}

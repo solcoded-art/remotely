@@ -1,0 +1,10 @@
+{
+ "note": "Made by real Electron 45 safeStorage under a throwaway app name with a test-only Keychain password (since deleted). Not a real secret.",
+ "password": "test-only-password-1234",
+ "plaintextAsync": "{\"privateKey\":\"-----BEGIN PRIVATE KEY-----\\nTEST\\n-----END PRIVATE KEY-----\\n\",\"pins\":{\"d_x\":{\"grantId\":\"g\",\"key\":{},\"name\":\"Ei’s 📱\"}}}",
+ "ciphertextAsync": "djEwyikANwS4b5p3ydav6NH2upz6kOI/N3MP2gNs2cwkPOvwfVCfHPYUokvFkLiDrnT/YdMTVggHSsYyxwONu2tBDaOFXVEu0/NahU5aTSXOLvcGmsOo7IU0TM3w3ZzGqfPNzhvf/rhKYm2L9F6HWKQPqtfriqCuFui0fF13dgGNJsxw+QN5fW2rLIoUGBEaTXdi",
+ "plaintextSync": "{\"token\":\"abcdefghijklmnop1234\",\"expires\":1}",
+ "ciphertextSync": "djEwcPKGAY1S0q3W98Y+Vj6DOOH1bwVyhpYvQ7DaDUKQS+FMm5tD4cZjCBBZy4lR0UqL",
+ "pkcs8Pem": "-----BEGIN PRIVATE KEY-----\nMIGHAgEAMBMGByqGSM49AgEGCCqGSM49AwEHBG0wawIBAQQg9GWbwoQr737hg3j7\nCiFAUNeyBdERs04Z+j8XKzdRanGhRANCAARVocxpjMTah0P6cLmfCQeQg9KVqR3q\nxJ++Jczjujb/siwefyXipQ9Ga+e6oodknwVVHChV65vQX1MeCKNcV4VC\n-----END PRIVATE KEY-----\n",
+ "jwkD": "9GWbwoQr737hg3j7CiFAUNeyBdERs04Z-j8XKzdRanE"
+}
