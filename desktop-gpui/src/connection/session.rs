@@ -113,6 +113,7 @@ pub struct Desktop {
     remember_plan: Option<RememberPlan>,
     /// The window picked on the prompt for the approval in progress.
     approving_remember_ms: i64,
+    permission_task: Option<Task<()>>,
 }
 
 impl Connection {
@@ -137,6 +138,25 @@ impl Connection {
         })
         .detach();
         self.check_permissions(false, cx);
+        // Pick up permissions granted in System Settings without a button press.
+        self.desktop.permission_task = Some(cx.spawn(async move |this, cx| loop {
+            cx.background_executor().timer(Duration::from_secs(2)).await;
+            let alive = this
+                .update(cx, |this, cx| {
+                    let d = &this.desktop;
+                    if !d.accessibility || !d.screen {
+                        let before = (d.accessibility, d.screen);
+                        this.check_permissions(false, cx);
+                        if (this.desktop.accessibility, this.desktop.screen) != before {
+                            crate::log::log(format!("permissions now: accessibility {}, screen recording {}", this.desktop.accessibility, this.desktop.screen));
+                        }
+                    }
+                })
+                .is_ok();
+            if !alive {
+                break;
+            }
+        }));
     }
 
     /// Re-reads Accessibility and Screen Recording. `prompt` opens the Accessibility dialog.

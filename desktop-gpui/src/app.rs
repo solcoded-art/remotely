@@ -772,13 +772,14 @@ impl MacRemote {
                 "Share a full display to switch between your editor, browser, and other apps. Your screen stays private until you approve a request.",
             ))
             .child(step(1, "Connect your account", state.ready, if state.ready { "Signed in. Use the same account on your phone.".into() } else { "Waiting for the account connection.".into() }))
-            .child(step(2, "Allow Screen Recording", d.screen, if d.screen { "Mac Remote can share your selected display.".into() } else { "Choose a display below. If macOS asks, enable Mac Remote in Privacy & Security → Screen & System Audio Recording.".into() }))
+            .child(step(2, "Allow Screen Recording", d.screen, if d.screen { "Mac Remote can share your selected display.".into() } else { "Choose a display below. If macOS asks, turn on Mac Remote in Privacy & Security → Screen & System Audio Recording, then quit and reopen Mac Remote.".into() }))
             .child(step(
                 3,
                 "Allow Accessibility",
                 control_ready,
                 if !d.accessibility { "Enable Mac Remote in System Settings → Privacy & Security → Accessibility.".into() } else if !d.driver_ready { "Permission is enabled, but the input driver is unavailable. Run npm run build:driver and reopen Mac Remote.".into() } else { "The input driver and control permission are ready.".into() },
             ))
+            .when(!d.screen || !d.accessibility, |panel| panel.child(permission_help(d.screen, d.accessibility)))
             .child(step(4, "Choose a display", d.selected.is_some(), if d.selected.is_some() { "This is the display your phone will see. End a session before changing it.".into() } else { "Select the display containing the editor or apps you want to use.".into() }))
             .child(displays);
         if let Some(error) = &d.setup_error {
@@ -1280,6 +1281,27 @@ fn header(actions: Div) -> Div {
         .border_color(theme::border())
         .child(div().text_size(px(16.)).font_weight(FontWeight::SEMIBOLD).child("Remotely"))
         .child(actions)
+}
+
+/// macOS ties privacy permissions to each build of an ad-hoc signed app, so after an
+/// update (or switching from the Electron app) "Mac Remote" can look switched on
+/// in System Settings without applying. Explain that and open the right pane.
+fn permission_help(screen: bool, accessibility: bool) -> Div {
+    const SCREEN: &str = "x-apple.systempreferences:com.apple.preference.security?Privacy_ScreenCapture";
+    const ACCESSIBILITY: &str = "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility";
+    notice(
+        "Already switched on in System Settings?",
+        "macOS keeps permissions per app version, so an entry from an earlier Mac Remote can look on but not apply. Select Mac Remote and remove it with −, or switch it off and on again. After changing Screen Recording, quit and reopen Mac Remote.",
+        false,
+    )
+    .child(
+        div()
+            .flex()
+            .flex_wrap()
+            .gap_2()
+            .when(!screen, |row| row.child(button("open-screen-settings", "Open Screen Recording settings", Style::Outline, false).on_click(|_, _, cx| cx.open_url(SCREEN))))
+            .when(!accessibility, |row| row.child(button("open-accessibility-settings", "Open Accessibility settings", Style::Outline, false).on_click(|_, _, cx| cx.open_url(ACCESSIBILITY)))),
+    )
 }
 
 /// "Skips approval for 2 more days", from a remembered record.
