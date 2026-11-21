@@ -238,7 +238,21 @@ async fn run(
     crate::log::log(format!("offer created ({} m-lines)", offer.sdp.matches("\nm=").count()));
     events.send(PeerEvent::Signal(json!({ "type": "offer", "sdp": offer.sdp }))).await?;
 
-    let mut payload_type = None;
+    // Video goes out on its own task: a large keyframe never delays reading input.
+    let negotiated: Arc<Mutex<Option<u8>>> = Arc::new(Mutex::new(None));
+    let video = {
+        let (track, negotiated) = (track.clone(), negotiated.clone());
+        let mut frames = std::mem::replace(frames, tokio::sync::mpsc::channel(1).1);
+        tokio::spawn(async move {
+            while let Some(frame) = frames.recv().await {
+                let payload_type = *negotiated.lock().unwrap();
+                if let Some(pt) = payload_type {
+                    let sample = Sample { data: Bytes::from(frame.data), duration: frame.duration, ..Sample::new(Instant::now()) };
+                    let _ = track.sample_writer(ssrc, pt).write_sample(&sample).await;
+                }
+            }
+        })
+    };
     let mut pending_candidates: Vec<RTCIceCandidateInit> = Vec::new();
     let mut answered = false;
     loop {
@@ -259,7 +273,7 @@ async fn run(
                             for candidate in pending_candidates.drain(..) {
                                 let _ = pc.add_ice_candidate(candidate).await;
                             }
-                            payload_type = sender.get_parameters().await?.rtp_parameters.codecs.first().map(|c| c.payload_type);
+                            *negotiated.lock().unwrap() = sender.get_parameters().await?.rtp_parameters.codecs.first().map(|c| c.payload_type);
                         }
                         Some("ice") => {
                             let c = signal.get("candidate").cloned().unwrap_or(Value::Null);
@@ -299,15 +313,9 @@ async fn run(
                 Some(DataChannelEvent::OnClose) | None => { events.send(PeerEvent::ChannelClosed).await?; break; }
                 Some(_) => {}
             },
-            frame = frames.recv() => {
-                let Some(frame) = frame else { break };
-                if let Some(pt) = payload_type {
-                    let sample = Sample { data: Bytes::from(frame.data), duration: frame.duration, ..Sample::new(Instant::now()) };
-                    let _ = track.sample_writer(ssrc, pt).write_sample(&sample).await;
-                }
-            }
         }
     }
+    video.abort();
     let _ = channel.close().await;
     let _ = pc.close().await;
     Ok(())

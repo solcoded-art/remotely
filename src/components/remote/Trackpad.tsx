@@ -4,6 +4,14 @@ import type { Command } from '@/lib/types';
 import { toLocalDelta, useScreenSpace } from './screen-space';
 
 /**
+ * Pointer acceleration, like a Mac trackpad: slow, precise movement keeps the set
+ * speed; a quick swipe (finger speed in CSS px per ms) covers up to 3× the distance.
+ */
+export function acceleration(pxPerMs: number) {
+  return 1 + 2 * Math.min(1, Math.max(0, (pxPerMs - 0.25) / 1.25));
+}
+
+/**
  * One finger moves, two fingers scroll, tap clicks, two-finger tap right-clicks.
  * When focused: arrow keys move (Shift for larger steps), Page Up/Down scroll, Enter clicks.
  */
@@ -11,7 +19,7 @@ export function Trackpad({ enabled, dragging, send }: { enabled: boolean; draggi
   const { trackpadSpeed } = usePreferences();
   const { rotated } = useScreenSpace();
   const gesture = useRef({ start: 0, moved: 0, fingers: 0 });
-  const active = useRef(new Map<number, { x: number; y: number }>());
+  const active = useRef(new Map<number, { x: number; y: number; t: number }>());
   const pending = useRef({ dx: 0, dy: 0, scroll: false, frame: 0 });
   const motion = () => dragging ? 'drag' : 'move';
 
@@ -37,7 +45,7 @@ export function Trackpad({ enabled, dragging, send }: { enabled: boolean; draggi
       if (!enabled) return;
       event.preventDefault(); event.currentTarget.setPointerCapture(event.pointerId);
       if (!active.current.size) gesture.current = { start: Date.now(), moved: 0, fingers: 1 };
-      active.current.set(event.pointerId, { x: event.clientX, y: event.clientY });
+      active.current.set(event.pointerId, { x: event.clientX, y: event.clientY, t: event.timeStamp });
       gesture.current.fingers = Math.max(gesture.current.fingers, active.current.size);
       flush();
     }}
@@ -46,8 +54,11 @@ export function Trackpad({ enabled, dragging, send }: { enabled: boolean; draggi
       if (!enabled || !previous) return;
       event.preventDefault();
       const [rawX, rawY] = toLocalDelta(rotated, event.clientX - previous.x, event.clientY - previous.y);
-      const dx = rawX * trackpadSpeed / active.current.size; const dy = rawY * trackpadSpeed / active.current.size;
-      active.current.set(event.pointerId, { x: event.clientX, y: event.clientY });
+      const scrolling = active.current.size >= 2;
+      // Scrolling keeps a constant speed; pointer moves accelerate with finger speed.
+      const gain = scrolling ? 1 : acceleration(Math.hypot(rawX, rawY) / Math.max(1, event.timeStamp - previous.t));
+      const dx = rawX * trackpadSpeed * gain / active.current.size; const dy = rawY * trackpadSpeed * gain / active.current.size;
+      active.current.set(event.pointerId, { x: event.clientX, y: event.clientY, t: event.timeStamp });
       gesture.current.moved += Math.abs(dx) + Math.abs(dy);
       const scroll = active.current.size >= 2;
       if (pending.current.scroll !== scroll) flush();

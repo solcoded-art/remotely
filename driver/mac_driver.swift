@@ -7,6 +7,9 @@ import ApplicationServices
 setbuf(stdout, nil)
 
 var mainDisplay = CGMainDisplayID()
+// Keyboard events come from the system keyboard source, like a physical keyboard;
+// some apps drop or ignore synthetic keys posted without one.
+let keyboardSource = CGEventSource(stateID: .hidSystemState)
 var heldButtons = Set<UInt32>()
 
 func reply(_ json: [String: Any], _ values: [String: Any]) {
@@ -210,8 +213,8 @@ func handleCommand(_ json: [String: Any]) {
         guard let code = (json["code"] as? NSNumber)?.uint16Value else { return }
         let modifiers = (json["modifiers"] as? [String]) ?? []
 
-        if let down = CGEvent(keyboardEventSource: nil, virtualKey: code, keyDown: true),
-           let up = CGEvent(keyboardEventSource: nil, virtualKey: code, keyDown: false) {
+        if let down = CGEvent(keyboardEventSource: keyboardSource, virtualKey: code, keyDown: true),
+           let up = CGEvent(keyboardEventSource: keyboardSource, virtualKey: code, keyDown: false) {
             var flags: CGEventFlags = []
             if modifiers.contains("cmd") { flags.insert(.maskCommand) }
             if modifiers.contains("shift") { flags.insert(.maskShift) }
@@ -231,13 +234,18 @@ func handleCommand(_ json: [String: Any]) {
         for char in text {
             let str = String(char)
             let utf16 = Array(str.utf16)
-            if let down = CGEvent(keyboardEventSource: nil, virtualKey: 0, keyDown: true),
-               let up = CGEvent(keyboardEventSource: nil, virtualKey: 0, keyDown: false) {
+            if let down = CGEvent(keyboardEventSource: keyboardSource, virtualKey: 0, keyDown: true),
+               let up = CGEvent(keyboardEventSource: keyboardSource, virtualKey: 0, keyDown: false) {
                 down.keyboardSetUnicodeString(stringLength: utf16.count, unicodeString: utf16)
                 up.keyboardSetUnicodeString(stringLength: utf16.count, unicodeString: utf16)
+                // Text, never a shortcut: ignore any modifier currently held on the Mac.
+                down.flags = []
+                up.flags = []
+                // Apps drop characters whose key-up arrives with no gap, or that come too fast.
                 down.post(tap: .cghidEventTap)
+                usleep(3000)
                 up.post(tap: .cghidEventTap)
-                usleep(2000)
+                usleep(3000)
             }
         }
 
